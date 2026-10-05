@@ -68,9 +68,10 @@ The pipeline performs **daily batch processing**, with weekly or monthly aggrega
 
 ### Incremental Extraction
 
-The current technical metadata does not specify a dedicated incremental extraction field or watermark. Therefore, the extraction is documented as a **batch extraction**.
+The VistaBalayan pipeline uses incremental extraction to retrieve newly added or updated tourism records from the PostgreSQL source database. The extraction uses the applicable reporting date or timestamp field to identify records within the defined extraction window. This approach minimizes unnecessary retrieval of previously processed records and allows the pipeline to focus on new or updated tourism data during each scheduled batch run.
 
-An incremental extraction rule may be defined in a future implementation once an approved timestamp or reporting-date field is established.
+An incremental extraction rule will use the approved date or timestamp field as the extraction reference. The extracted records will then undergo extraction-level validation before being handed over to the Transformation Stage.
+
 
 ## 1.4 Extraction Scope
 
@@ -229,3 +230,34 @@ Examples of critical failures include:
 
 ---
 
+# 4. Extraction Metadata and Log Specification
+
+Each extraction run must generate metadata that allows the team to monitor, troubleshoot, audit, and recover the pipeline.
+
+| Metadata Field | Purpose | Example |
+|---|---|---|
+| `pipeline_run_id` | Unique identifier for the extraction run | `VB-20260930-001` |
+| `table_name` | Identifies the extracted table | `visitor_reports` |
+| `extraction_start_timestamp` | Records when extraction started | `2026-09-30 01:00:00` |
+| `extraction_end_timestamp` | Records when extraction ended | `2026-09-30 01:02:14` |
+| `extraction_status` | Indicates extraction result | `SUCCESS` |
+| `records_read` | Number of records read from source | `1250` |
+| `records_extracted` | Number of records successfully extracted | `1250` |
+| `records_rejected` | Number of records rejected during extraction validation | `0` |
+| `extraction_window` | Identifies the extraction range | `2026-09-29 to 2026-09-30` |
+| `validation_result` | Records validation outcome | `PASS` |
+| `error_message` | Records extraction error when applicable | `NULL` |
+| `error_code` | Identifies the extraction error | `NULL` |
+| `extraction_duration` | Measures execution time | `00:02:14` |
+
+## 4.1 Use of Metadata and Logs
+
+The metadata and logs will be used for:
+
+- **Monitoring** — determine whether scheduled extraction runs completed successfully.
+- **Troubleshooting** — identify the affected table, run, timestamp, or error.
+- **Auditing** — maintain a historical record of extraction activities.
+- **Recovery** — identify incomplete or failed runs that require retry.
+- **Validation** — compare extraction counts and validation results between runs.
+
+---
