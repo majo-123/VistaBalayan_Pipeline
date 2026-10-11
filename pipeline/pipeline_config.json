@@ -1,0 +1,35 @@
+{
+  "pipeline_name": "VistaBalayan Tourism Data Analytics and Decision Support Pipeline",
+  "raw_data_dir": "pipeline/raw",
+  "sqlite_output": "pipeline/processed/vistabalayan_staging.sqlite",
+  "log_dir": "documentation/logs",
+  "tables": {
+    "establishments": {
+      "file": "establishments.csv",
+      "primary_key": "id",
+      "required_columns": ["id", "name", "type", "status"],
+      "date_columns": ["created_at", "updated_at"]
+    },
+    "visitor_reports": {
+      "file": "visitor_reports.csv",
+      "primary_key": "id",
+      "required_columns": ["id", "establishment_id", "report_date", "status"],
+      "foreign_keys": [{"column": "establishment_id", "references_table": "establishments", "references_column": "id"}],
+      "date_columns": ["report_date", "created_at", "updated_at"]
+    },
+    "accommodation_reports": {
+      "file": "accommodation_reports.csv",
+      "primary_key": "id",
+      "required_columns": ["id", "establishment_id", "report_date", "status"],
+      "foreign_keys": [{"column": "establishment_id", "references_table": "establishments", "references_column": "id"}],
+      "date_columns": ["report_date", "created_at", "updated_at"]
+    },
+    "room_occupancy_details": {
+      "file": "room_occupancy_details.csv",
+      "primary_key": "id",
+      "required_columns": ["id", "accommodation_report_id"],
+      "foreign_keys": [{"column": "accommodation_report_id", "references_table": "accommodation_reports", "references_column": "id"}],
+      "date_columns": ["created_at", "updated_at"]
+    }
+  }
+}

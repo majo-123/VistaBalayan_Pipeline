@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Local secrets
+.env
+.env.*
+!.env.example
+
+# Local ETL data outputs
+/pipeline/raw/*
+/pipeline/processed/*
+/documentation/logs/*.json
+/documentation/logs/*.log
+
+# Keep directory placeholders
+!/pipeline/raw/.gitkeep
+!/pipeline/processed/.gitkeep
+!/documentation/logs/.gitkeep
+
+# OS/editor
+.DS_Store
+.vscode/
+
+/requirements.txt
