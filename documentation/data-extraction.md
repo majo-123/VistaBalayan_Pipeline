@@ -377,3 +377,172 @@ The extraction process will check whether the source tables, column names, data 
 Schema validation results and related errors will be recorded in the extraction logs to maintain consistency between the source database, extraction script, and output dataset.
 
 ---
+
+# 7. Extraction Acceptance and Handover Rules
+
+## 7.1 Automatic Approval
+
+The extraction can automatically proceed to the Transformation Stage when:
+
+- PostgreSQL connection succeeds.
+- All required source tables exist.
+- All required columns exist.
+- Required identifiers are present.
+- Primary keys pass uniqueness validation.
+- Extraction completes without interruption.
+- Record counts are successfully captured.
+- No critical validation check fails.
+
+**Decision:** `APPROVED`
+
+**Pipeline Action:** Proceed to Transformation.
+
+## 7.2 Manual Review
+
+Manual review is required when:
+
+- A non-critical validation warning occurs.
+- The extracted record count differs from an expected operational range.
+- A non-critical schema change is detected.
+- Metadata is incomplete but extracted records remain available.
+- The extraction completes with warnings.
+
+**Decision:** `MANUAL REVIEW`
+
+**Pipeline Action:** Hold the pipeline until an authorized person reviews the warning.
+
+## 7.3 Rejection or Failure
+
+The extraction must be rejected when:
+
+- PostgreSQL is inaccessible.
+- A required table is missing.
+- A required column is missing.
+- A critical identifier is unavailable.
+- A critical extraction error interrupts the process.
+- The extracted dataset cannot be reliably traced to the extraction run.
+
+**Decision:** `REJECTED`
+
+**Pipeline Action:** Stop the pipeline, record the error, and retry when the failure is recoverable. If repeated attempts fail, quarantine or hold the affected extraction for investigation.
+
+## 7.4 Handover
+
+The following must be passed to the Transformation Stage:
+
+1. Raw extracted tourism dataset.
+2. Source table names.
+3. Pipeline run ID.
+4. Extraction start and end timestamps.
+5. Record counts.
+6. Extraction status.
+7. Validation results.
+8. Extraction window, when applicable.
+9. Error information, when applicable.
+10. Source-to-standardized field mapping.
+
+The handover must contain the raw extracted data and extraction metadata without applying business transformations that belong to the Transformation Stage.
+
+## 7.5 Decision Rules
+
+| Overall Condition | Acceptance Decision | Pipeline Action |
+|---|---|---|
+| All critical validation checks PASS | **APPROVED** | Proceed to Transformation |
+| Non-critical WARNING only | **MANUAL REVIEW** | Hold pipeline for review |
+| Critical validation FAIL | **REJECTED** | Stop, retry, or quarantine |
+| Source database unavailable | **REJECTED** | Retry extraction |
+| Required table missing | **REJECTED** | Stop and investigate schema |
+| Required column missing | **REJECTED** | Stop and investigate schema |
+| Extraction completed with valid metadata | **APPROVED** | Handover to Transformation |
+
+## 7.6 Validation Summary
+
+| Validation Check | Result |
+|---|---|
+| PostgreSQL connection | PASS |
+| `establishments` table validation | PASS |
+| `visitor_reports` table validation | PASS |
+| `accommodation_reports` table validation | PASS |
+| `room_occupancy_details` table validation | PASS |
+| Required identifiers | PASS |
+| Primary key uniqueness | PASS |
+| Record count captured | PASS |
+| Extraction completion | PASS |
+| Overall Extraction | **APPROVED** |
+
+---
+
+# 8. Common Extraction Problems and Mitigation
+
+| Problem | Possible Cause | Impact on Extraction | Proposed Solution / Mitigation |
+|---|---|---|---|
+| PostgreSQL connection failure | Database unavailable, incorrect connection configuration, or network interruption | Tourism records cannot be extracted | Verify database availability and connection settings, then retry |
+| Required table is missing | Database schema changed or table was removed | Required dataset cannot be retrieved | Stop the pipeline and verify the PostgreSQL schema |
+| Required column is missing | Column renamed, removed, or schema changed | Extracted dataset may be incomplete | Fail validation and require schema review |
+| Missing required identifiers | Source records contain incomplete identifiers | Relationships between datasets may not be reliable | Flag the affected extraction and require review |
+| Extraction interruption | Network failure, database timeout, or Python process failure | Only part of the source data may be extracted | Record the failed run and retry the extraction |
+| Database schema change | Data type, column name, or constraint changed | Python extraction may fail or become incompatible | Validate schema before extraction and update the data contract through an authorized process |
+| Large extraction volume | Increasing tourism records | Longer extraction time and higher resource usage | Monitor extraction duration and maintain scheduled batch processing |
+
+
+---
+
+# 9. Extraction Handover Package
+
+The completed Stage 1 extraction package should contain:
+
+```text
+Stage 1 Extraction Package
+|
++-- Raw Tourism Dataset
+|   +-- establishments
+|   +-- visitor_reports
+|   +-- accommodation_reports
+|   +-- room_occupancy_details
+|
++-- Extraction Metadata
+|   +-- Pipeline Run ID
+|   +-- Start Timestamp
+|   +-- End Timestamp
+|   +-- Extraction Status
+|   +-- Records Read
+|   +-- Records Extracted
+|   +-- Records Rejected
+|   +-- Extraction Duration
+|
++-- Validation Results
+|   +-- Connection Check
+|   +-- Schema Check
+|   +-- Identifier Check
+|   +-- Uniqueness Check
+|   +-- Completeness Check
+|
++-- Data Contract
+    +-- Source Schema
+    +-- Required Columns
+    +-- Data Types
+    +-- Field Mappings
+```
+
+The Transformation Stage should only begin when the extraction satisfies the defined acceptance criteria or has been explicitly approved following manual review.
+
+---
+
+# 10. Stage 1 Overall Acceptance
+
+Stage 1 is considered complete when:
+
+- The VistaBalayan PostgreSQL source is accessible.
+- Required tourism tables and columns are available.
+- Tourism records are successfully retrieved using Python.
+- Extraction metadata is recorded.
+- Extraction-level validation checks are completed.
+- Warnings and failures are documented.
+- The raw extracted dataset is traceable to its pipeline run.
+- The extraction package is handed over to the Transformation Stage.
+
+### Overall Stage 1 Decision
+
+**APPROVED FOR TRANSFORMATION** when all critical extraction checks pass.
+
+Data cleaning, standardization, aggregation, filtering, joining, and business transformations are not performed as part of this extraction-stage acceptance decision. These activities belong to the succeeding stages of the VistaBalayan data pipeline.
