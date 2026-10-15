@@ -261,3 +261,119 @@ The metadata and logs will be used for:
 - **Validation** — compare extraction counts and validation results between runs.
 
 ---
+
+# 5. Log Retention and Access
+
+## 5.1 Log Retention Period
+
+**Operational log retention:** 1 year.
+
+The retention period provides sufficient history for troubleshooting extraction problems, reviewing pipeline runs, and supporting operational monitoring.
+
+
+## 5.2 Storage Location
+
+Extraction metadata and operational logs should be stored in a controlled database table or designated pipeline logging storage associated with the VistaBalayan data pipeline.
+
+The exact production logging location is not specified in the current technical metadata and must be finalized during implementation.
+
+## 5.3 Access Permissions
+
+Access to extraction logs should be limited to authorized personnel responsible for:
+
+- Data pipeline maintenance
+- System administration
+- Data engineering
+- Municipal tourism system administration
+
+Public users should not have access to internal extraction logs.
+
+## 5.4 Archiving
+
+Logs that reach the end of their active retention period may be archived when required for auditing or operational history.
+
+Archived logs must remain protected from unauthorized modification.
+
+## 5.5 Deletion Rules
+
+Operational logs must not be deleted before the defined retention period.
+
+Logs must also be retained while they are required for:
+
+- Troubleshooting
+- Auditing
+- Recovery
+- Investigation of failed extraction runs
+
+Deletion should occur only through an authorized retention process.
+
+---
+
+# 6. Extraction Data Contract and Naming Convention
+
+## 6.1 Required Schema
+
+The extraction data contract defines the expected source tables, fields, data types, identifiers, and documented constraints of the VistaBalayan Tourism Data Analytics and Decision Support Pipeline. The source data comes from the VistaBalayan PostgreSQL database and is retrieved using Python for the extraction stage.
+
+| Source Table | Expected Fields | Data Types | Required Identifiers and Constraints |
+|---|---|---|---|
+| `establishments` | `id`, `name`, `type`, `total_rooms` | UUID, VARCHAR(150), VARCHAR(50), INTEGER | `id` — Primary Key; `name` and `type` — NOT NULL; `total_rooms` — DEFAULT 0 |
+| `visitor_reports` | `id`, `establishment_id`, `report_date`, `male_visitors`, `female_visitors`, `total_visitors`, `residence_category`, `municipality`, `province`, `country` | UUID, UUID, DATE, INTEGER, INTEGER, INTEGER, VARCHAR(50), VARCHAR(100), VARCHAR(100), VARCHAR(100) | `id` — Primary Key; `establishment_id` — Foreign Key referencing `establishments.id`; `report_date` — NOT NULL; `total_visitors` — NOT NULL |
+| `accommodation_reports` | `id`, `establishment_id`, `report_date`, `total_rooms`, `occupied_rooms`, `guest_check_ins`, `guest_nights`, `foreign_guest_check_ins`, `foreign_guest_nights` | UUID, UUID, DATE, INTEGER, INTEGER, INTEGER, INTEGER, INTEGER, INTEGER | `id` — Primary Key; `establishment_id` — Foreign Key referencing `establishments.id`; `report_date` and `total_rooms` — NOT NULL |
+| `room_occupancy_details` | `id`, `accommodation_report_id`, `room_type`, `number_of_rooms`, `occupied_rooms`, `check_ins`, `guest_nights` | UUID, UUID, VARCHAR(100), INTEGER, INTEGER, INTEGER, INTEGER | `id` — Primary Key; `accommodation_report_id` — Foreign Key referencing `accommodation_reports.id`; `room_type` — NOT NULL |
+
+The expected fields and data types follow the source schema documented for VistaBalayan. Primary keys identify individual records, while documented foreign keys establish relationships between tables. Fields marked `NOT NULL` and fields with documented defaults must be checked against the source schema.
+
+## 6.2 Naming Convention
+
+The VistaBalayan extraction pipeline follows consistent naming rules to maintain readability and consistency across the PostgreSQL source tables, Python extraction scripts, and extracted datasets.
+
+| Naming Rule | Specification |
+|---|---|
+| Column Naming Format | Use lowercase letters and `snake_case`, where multiple words are separated by underscores. Examples include `report_date`, `total_visitors`, and `accommodation_report_id`. |
+| Abbreviations | Avoid unnecessary abbreviations and use descriptive names that represent the stored data. Existing source column names should be retained unless a justified mapping is documented. |
+| Naming Consistency | Use the same column names consistently in the pipeline documentation, Python extraction scripts, and corresponding output fields. |
+| Primary Key Naming | The documented tables use `id` as the primary key, such as `establishments.id`, `visitor_reports.id`, `accommodation_reports.id`, and `room_occupancy_details.id`. |
+| Foreign Key Naming | Use the referenced entity name followed by `_id` for documented foreign-key fields. Examples include `establishment_id` and `accommodation_report_id`. |
+| Date Field Naming | Use `_date` for fields that store dates, such as `report_date`. Retain the documented source field names. |
+
+These naming conventions help keep extracted fields identifiable and consistent throughout the pipeline. Any approved changes to field names must be recorded in the source-to-standardized field mapping.
+
+## 6.3 Source-to-Standardized Field Mapping
+
+The source-to-standardized field mapping documents how source columns are represented in the extracted datasets. The VistaBalayan pipeline retains the documented source column names and data types unless a justified and documented transformation is required. The following table provides representative mappings from the documented source tables.
+
+| Source Column | Standardized Column | Source Type | Target Type | Mapping Type |
+|---|---|---|---|---|
+| `establishments.id` | `id` | UUID | UUID | Direct mapping |
+| `establishments.name` | `name` | VARCHAR(150) | VARCHAR(150) | Direct mapping |
+| `establishments.type` | `type` | VARCHAR(50) | VARCHAR(50) | Direct mapping |
+| `visitor_reports.id` | `id` | UUID | UUID | Direct mapping |
+| `visitor_reports.establishment_id` | `establishment_id` | UUID | UUID | Direct mapping |
+| `visitor_reports.report_date` | `report_date` | DATE | DATE | Direct mapping |
+| `visitor_reports.total_visitors` | `total_visitors` | INTEGER | INTEGER | Direct mapping |
+| `accommodation_reports.id` | `id` | UUID | UUID | Direct mapping |
+| `accommodation_reports.report_date` | `report_date` | DATE | DATE | Direct mapping |
+| `accommodation_reports.occupied_rooms` | `occupied_rooms` | INTEGER | INTEGER | Direct mapping |
+| `room_occupancy_details.accommodation_report_id` | `accommodation_report_id` | UUID | UUID | Direct mapping |
+| `room_occupancy_details.room_type` | `room_type` | VARCHAR(100) | VARCHAR(100) | Direct mapping |
+| `room_occupancy_details.guest_nights` | `guest_nights` | INTEGER | INTEGER | Direct mapping |
+
+The standardized column names must remain consistent throughout the extraction documentation, scripts, and output datasets. If a source column is renamed or its data type is converted, the mapping must be updated to identify the source field, standardized field, source type, target type, and mapping operation.
+
+**Note:** The target types above represent direct mappings based on the documented source types. They should be verified against the actual extraction output requirements. The table provides representative examples rather than a complete mapping of every column.
+
+### 6.4 Schema Consistency
+
+The extraction process will check whether the source tables, column names, data types, required identifiers, and documented constraints match the data contract. Unexpected changes will be handled as follows:
+
+- **Column Name Changes:** If a required column is renamed or unavailable, the issue will be flagged and recorded in the extraction log. Extraction must not proceed if the affected column is necessary for the process.
+- **Data Type Changes:** If a column's data type differs from the documented schema, the change will be flagged for review to determine its effect on extraction and the expected output.
+- **Missing Required Fields:** If a required column or identifier is missing, schema validation will fail, and the issue will be recorded in the extraction log.
+- **Unexpected Additional Columns:** Additional columns will not automatically be included in the output unless they are reviewed and approved.
+- **Foreign-Key Relationships:** The documented relationships between `visitor_reports`, `accommodation_reports`, `room_occupancy_details`, and `establishments` must be checked against the source schema.
+- **Approved Schema Changes:** Approved changes will be documented and reflected in the Python extraction script when necessary.
+
+Schema validation results and related errors will be recorded in the extraction logs to maintain consistency between the source database, extraction script, and output dataset.
+
+---
