@@ -100,3 +100,30 @@ The stage performs profiling, column normalization, whitespace cleanup, date sta
 - The input schema can contain additional source columns; they are retained unless renamed by the output contract.
 - Numeric detection uses an explicit allowlist. Text fields such as `guest_name`, `guest_group_name`, `room_code`, and `room_type` are never treated as numeric merely because their names contain `guest` or `room`.
 - No target database, warehouse, dimensional model, or surrogate-key load is created in this stage.
+
+
+# 2. Data Profiling and Issue Identification
+
+Data profiling is performed on the data extracted from the VistaBalayan Tourism System before applying standardization and transformation rules. The profiling process examines the four source datasets: `establishments`, `visitor_reports`, `accommodation_reports`, and `room_occupancy_details`.
+
+The purpose is to identify potential data quality issues, including missing values, duplicate records, inconsistent formats, invalid business values, and incorrect data types. Each identified issue is documented with its affected table and column, a sample value, the number or percentage of affected records, and the planned treatment based on the rules defined in the succeeding sections.
+
+## 2.1 Data Profiling and Issue Identification Table
+
+The following table identifies the data quality issues that should be examined in the extracted VistaBalayan datasets. The examples are illustrative and must be verified against the actual extracted records. Affected record counts and percentages must be completed after profiling.
+
+| Table or File | Column Affected | Issue Type | Example of the Issue | Estimated Affected Records | Planned Treatment |
+|---|---|---|---|---|---|
+| `establishments.csv` | `name` | Missing values | Empty or null establishment name | 1–3% (estimated) | Apply the required-field validation rule in Section 3. Records with missing establishment names will be flagged for review. |
+| `establishments.csv` | `type` | Inconsistent formats | `Hotel`, `HOTEL`, `hotel` | 5–10% (estimated) | Standardize text casing and map establishment types to consistent reference values under Section 4. |
+| `establishments.csv` | `id` | Duplicate values | The same UUID appears more than once | 0–1% (estimated) | Check identifier uniqueness and flag duplicate records for investigation under Section 3. |
+| `visitor_reports.csv` | `report_date` | Inconsistent date formats | `2026/10/18`, `2026-10-18` | 1–5% (estimated) | Convert valid dates to ISO 8601 format (`YYYY-MM-DD`) under Section 4. |
+| `visitor_reports.csv` | `male_visitors`, `female_visitors`, `total_visitors` | Invalid numeric values | `-5`, `2.5`, `abc` | 1–3% (estimated) | Convert values to integers and validate that visitor counts are nonnegative. Flag invalid records under Sections 3 and 4. |
+| `visitor_reports.csv` | `establishment_id` | Invalid reference values | An ID that does not exist in `establishments.csv` | 0–2% (estimated) | Validate establishment references and flag unmatched IDs for review under Section 3. |
+| `visitor_reports.csv` | `municipality`, `province`, `country` | Inconsistent text formats | `Balayan`, `BALAYAN`, `balayan` | 5–15% (estimated) | Standardize text formatting and apply reference-value mappings where applicable under Section 4. |
+| `accommodation_reports.csv` | `total_rooms`, `occupied_rooms`, `guest_check_ins`, `guest_nights` | Invalid numeric values | Negative counts or non-integer values | 1–3% (estimated) | Convert values to integers and validate nonnegative counts. Flag invalid records under Sections 3 and 4. |
+| `accommodation_reports.csv` | `report_date` | Missing values | Empty report date | 1–3% (estimated) | Validate required dates and flag records with missing dates for review under Sections 3 and 4. |
+| `room_occupancy_details.csv` | `room_type` | Inconsistent text formats | `Deluxe`, `DELUXE`, `deluxe` | 5–10% (estimated) | Standardize room-type labels using consistent casing and reference values under Section 4. |
+| `room_occupancy_details.csv` | `accommodation_report_id` | Invalid reference values | An ID that does not exist in `accommodation_reports.csv` | 0–2% (estimated) | Validate the relationship between room occupancy details and accommodation reports under Section 3. |
+| `room_occupancy_details.csv` | `number_of_rooms`, `occupied_rooms`, `check_ins`, `guest_nights` | Invalid numeric values | Negative room count or decimal check-in count | 1–3% (estimated) | Convert values to integers, validate nonnegative counts, and flag invalid records under Sections 3 and 4. |
+
