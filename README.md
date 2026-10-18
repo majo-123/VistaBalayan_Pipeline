@@ -6,7 +6,7 @@ The **VistaBalayan Tourism Data Analytics and Decision Support Pipeline** is des
 
 The pipeline processes tourism records such as **establishment information, visitor reports, accommodation reports, and room occupancy details**. The source data is stored in the VistaBalayan **PostgreSQL database**, while **Python** is used to retrieve tourism records for batch processing.
 
-The pipeline is organized into several stages:
+The pipeline follows the **Extract, Transform, and Load (ETL)** approach, which consists of three main stages.
 
 ```text
 VistaBalayan Tourism System
@@ -16,23 +16,23 @@ VistaBalayan Tourism System
           |
           v
    1. Data Extraction
+      (Completed)
           |
           v
    2. Data Transformation
+      (In Progress)
           |
           v
-   3. Data Processing / Storage
+   3. Data Loading
           |
           v
-   4. Data Analytics
-          |
-          v
-   5. Reporting and Decision Support
+   Processed Data Storage
 ```
 
-> **Current Progress:** The project is currently at **Stage 1: Data Extraction**. The current work focuses on retrieving tourism records from the VistaBalayan PostgreSQL database and validating the extracted data before it proceeds to the succeeding stages.
+> **Current Progress:** The Data Extraction stage has been completed. The project is currently focused on **Stage 2: Data Transformation**, which involves cleaning, standardizing, validating, and preparing the extracted tourism records for loading into the designated processed-data storage.
 
 ---
+
 
 ## Pipeline Stages
 
@@ -49,7 +49,7 @@ The current extraction scope includes:
 
 The extracted data undergoes initial validation to verify the source connection, required tables and columns, identifiers, relationships, record counts, and extraction status.
 
-**Status:** 🟡 In Progress
+**Status:** ✅ Completed
 
 **Documentation:** `documentation/data-extraction.md`
 
@@ -68,23 +68,33 @@ Planned activities include:
 - Data aggregation
 - Validation of transformed records
 
-**Status:** ⚪ Not Yet Started
+**Status:** 🟡 In Progress
+
+**Documentation:** `documentation/data-transformation.md`
 
 ---
+### Stage 3 — Data Loading
 
-### Stage 3 — Data Processing / Storage
+The Data Loading stage transfers validated and transformed tourism data into the designated processed-data storage.
 
-The Data Processing / Storage stage will organize and store the transformed tourism data in the designated processed-data layer for succeeding analytics and reporting activities.
+This stage ensures that processed records are stored in an organized and consistent structure suitable for subsequent data retrieval, analysis, and reporting.
 
-The specific processing and storage procedures will be documented as the pipeline progresses.
+The planned activities include:
+
+- Preparing the target tables and storage structure.
+- Loading transformed tourism records into the designated processed-data database.
+- Maintaining relationships and identifiers across related records.
+- Validating the loaded data against the transformed dataset.
+- Recording loading results, including record counts and processing status.
+- Handling loading errors and preventing unintended duplicate records where applicable.
+
+The specific loading procedures and validation rules will be documented as implementation progresses.
 
 **Status:** ⚪ Not Yet Started
 
+**Documentation:** To be documented during implementation.
 
-### Stage 4 —
-
-
-
+---
 
 
 

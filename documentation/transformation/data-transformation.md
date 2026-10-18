@@ -189,3 +189,82 @@ Records rejected from the clean output must be retained in a quarantine location
 ## 3.6 Relationship to Data Profiling
 
 The cleaning rules in this section are intended to address the potential issues described in Section 2. Before finalizing the pipeline, the data profiling process must confirm which issues actually exist in the extracted datasets. Rules that are not triggered should be recorded as checks performed with zero affected records, where applicable. Actual counts and percentages must be calculated from profiling and cleaning logs rather than estimated.
+
+
+# 4. Standardization and Data Type Rules
+
+Standardization ensures that the extracted VistaBalayan tourism datasets use consistent data types, formats, and reference values before being loaded into the processed database. This stage follows the cleaning rules defined in Section 3 and applies consistent representations to establishment information, visitor reports, accommodation reports, and room occupancy details.
+
+The transformation process uses Python to validate and convert extracted CSV values according to the expected PostgreSQL data types and the business requirements of the VistaBalayan Tourism Data Analytics and Decision Support Pipeline. Original source values are not silently overwritten when conversion fails. Invalid records are logged and sent to quarantine for review in accordance with the cleaning and logging procedures.
+
+## 4.1 Data Types
+
+The following table defines the target data types for the important columns in the VistaBalayan datasets. The types are based on the documented source schema. UUIDs are retained as identifiers, dates are converted to valid date values, and count fields are represented as integers.
+
+
+## 4.1 Data Types
+
+The following table defines the target data types for important columns in the VistaBalayan datasets and specifies how the pipeline handles values that cannot be converted or validated successfully.
+
+
+# 4. Standardization and Data Type Rules
+
+Standardization ensures that the extracted VistaBalayan tourism datasets use consistent data types, formats, and reference values before they are loaded into the processed database. This stage follows the cleaning rules in Section 3 and applies consistent representations to establishment information, visitor reports, accommodation reports, and room occupancy details.
+
+The transformation process uses Python to validate and convert values from the extracted CSV files according to the expected data types and business requirements of the VistaBalayan Tourism Data Analytics and Decision Support Pipeline. Values that cannot be converted or validated are flagged for review, logged, and excluded from the clean dataset until they are corrected and validated. Records are not silently deleted.
+
+## 4.1 Data Types
+
+The following table defines the target data types for the important columns in the VistaBalayan datasets and specifies what happens when a value cannot be converted or validated.
+
+
+| Rule ID | Column | Source Format | Standard Format | On Failure |
+|---|---|---|---|---|
+| S-01 | `establishments.id` | UUID stored as text | UUID | Reject and log |
+| S-02 | `establishments.name` | Text with leading or trailing spaces | Trimmed text, VARCHAR(150) | Reject and log if missing or invalid |
+| S-03 | `establishments.type` | `hotel`, `HOTEL`, `Hotel` | Approved establishment type | Set to `UNKNOWN` if permitted; otherwise reject and log |
+| S-04 | `establishments.total_rooms` | Numeric text | INTEGER | Reject and log |
+| S-05 | `visitor_reports.report_date` | `MM/DD/YYYY` or `YYYY/MM/DD` | `YYYY-MM-DD` (DATE) | Reject and log |
+| S-06 | `visitor_reports.male_visitors` | Numeric text | INTEGER, nonnegative | Reject and log |
+| S-07 | `visitor_reports.female_visitors` | Numeric text | INTEGER, nonnegative | Reject and log |
+| S-08 | `visitor_reports.total_visitors` | Numeric text | INTEGER, nonnegative | Reject and log |
+| S-09 | `visitor_reports.municipality` | Text with inconsistent casing or spaces | Standard municipality name | Set to `UNKNOWN` if allowed; otherwise retain NULL or reject according to the field requirement |
+| S-10 | `visitor_reports.province` | Text with inconsistent casing or spaces | Standard province name | Set to `UNKNOWN` if allowed; otherwise retain NULL or reject according to the field requirement |
+| S-11 | `visitor_reports.country` | Country name or alias | Standard country name | Set to `UNKNOWN` if allowed; otherwise retain NULL or reject according to the field requirement |
+| S-12 | `visitor_reports.establishment_id` | UUID stored as text | UUID referencing an existing establishment | Reject and log |
+| S-13 | `accommodation_reports.id` | UUID stored as text | UUID | Reject and log |
+| S-14 | `accommodation_reports.report_date` | `MM/DD/YYYY` or `YYYY/MM/DD` | `YYYY-MM-DD` (DATE) | Reject and log |
+| S-15 | `accommodation_reports.total_rooms` | Numeric text | INTEGER, nonnegative | Reject and log |
+| S-16 | `accommodation_reports.occupied_rooms` | Numeric text | INTEGER, nonnegative and not greater than total rooms | Reject and log |
+| S-17 | `accommodation_reports.guest_check_ins` | Numeric text | INTEGER, nonnegative | Reject and log |
+| S-18 | `accommodation_reports.guest_nights` | Numeric text | INTEGER, nonnegative | Reject and log |
+| S-19 | `accommodation_reports.foreign_guest_check_ins` | Numeric text | INTEGER, nonnegative | Reject and log |
+| S-20 | `accommodation_reports.foreign_guest_nights` | Numeric text | INTEGER, nonnegative | Reject and log |
+| S-21 | `room_occupancy_details.id` | UUID stored as text | UUID | Reject and log |
+| S-22 | `room_occupancy_details.accommodation_report_id` | UUID stored as text | UUID referencing an existing accommodation report | Reject and log |
+| S-23 | `room_occupancy_details.room_type` | Text with inconsistent casing or spaces | Approved room-type value | Map to the standard value; reject and log if unrecognized and required |
+| S-24 | `room_occupancy_details.number_of_rooms` | Numeric text | INTEGER, nonnegative | Reject and log |
+| S-25 | `room_occupancy_details.occupied_rooms` | Numeric text | INTEGER, nonnegative and not greater than number of rooms | Reject and log |
+| S-26 | `room_occupancy_details.check_ins` | Numeric text | INTEGER, nonnegative | Reject and log |
+| S-27 | `room_occupancy_details.guest_nights` | Numeric text | INTEGER, nonnegative | Reject and log |
+
+## 4.2 Formats
+
+All valid report dates are standardized to ISO 8601 format (`YYYY-MM-DD`), such as `2026-10-18`. Valid and unambiguous date formats are converted, while invalid dates are rejected and logged.
+
+Visitor counts, room counts, check-ins, and guest nights must be nonnegative integers. Fractional, negative, or nonnumeric values are rejected and logged instead of being rounded or automatically replaced with zero.
+
+Text fields are trimmed to remove unnecessary whitespace. Establishment names and location names retain their official spelling, while establishment types, room types, and residence categories are standardized using approved mappings. The current datasets contain no currency or decimal-valued fields, so currency conversion and rounding rules are not applicable.
+
+## 4.3 Reference Values and Codes
+
+Inconsistent values are mapped to approved standard values when their meanings are equivalent. For example, `hotel`, `HOTEL`, and `Hotel` may be standardized to `HOTEL`. Room types, residence categories, and location names follow verified reference values.
+
+Unrecognized or ambiguous values are rejected and logged when they are required, or retained as `NULL` when optional and permitted by the target schema. UUID references are validated to ensure that visitor and accommodation reports reference existing establishments and room occupancy details reference existing accommodation reports.
+
+## 4.4 Handling of Conversion Failures
+
+Values that cannot be converted or validated are rejected from the clean output and logged with the rule ID, dataset, affected column, original value, and reason for failure. Missing required values, invalid dates, malformed UUIDs, and invalid numeric counts follow the cleaning rules in Section 3.
+
+Rejected records are not silently deleted. They must be recorded for review and may be corrected and processed again after verification. The pipeline maintains counts of successful conversions, failed conversions, and rejected records for reporting and auditing under Sections 7 and 8.
+
