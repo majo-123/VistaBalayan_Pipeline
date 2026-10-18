@@ -268,3 +268,52 @@ Values that cannot be converted or validated are rejected from the clean output 
 
 Rejected records are not silently deleted. They must be recorded for review and may be corrected and processed again after verification. The pipeline maintains counts of successful conversions, failed conversions, and rejected records for reporting and auditing under Sections 7 and 8.
 
+
+
+
+## 5. Business Transformation Rules
+
+This stage transforms cleaned VistaBalayan tourism data into business-ready data for visitor monitoring, accommodation analysis, and monthly tourism reporting. The rules include derived columns, joins, aggregations, and filtering. Each rule is applied after data cleaning, and records excluded by business rules are counted and logged with their corresponding reasons.
+
+### 5.1 Business Transformation Rules
+
+| Rule ID | Input Columns | Logic or Formula | Output Column | Business Reason |
+|---|---|---|---|---|
+| B-01 | `male_visitors`, `female_visitors` | Calculate the sum of male and female visitors. Compare the result with the recorded `total_visitors`. | `calculated_total_visitors` | Supports visitor count validation and consistent reporting. |
+| B-02 | `report_date` | Extract the year and month from the report date. | `report_year`, `report_month` | Enables monthly and yearly tourism reporting. |
+| B-03 | `report_date` | Extract the calendar date from the valid report date. | `report_day` | Supports daily visitor monitoring and daily aggregation. |
+| B-04 | `establishment_id` | Join visitor reports with establishment records using `establishment_id`. Use an inner join for business-ready records; log unmatched reports as excluded records. | `establishment_name`, `establishment_type` | Identifies the establishment associated with each visitor report. |
+| B-05 | `establishment_id` | Join accommodation reports with establishment records using `establishment_id`. Use an inner join for business-ready records; log unmatched reports as excluded records. | `establishment_name`, `establishment_type` | Connects accommodation information to the correct establishment. |
+| B-06 | `total_rooms`, `occupied_rooms` | Calculate `(occupied_rooms / total_rooms) × 100` when `total_rooms` is greater than zero. | `occupancy_rate` | Measures room utilization for accommodation analysis. |
+| B-07 | `number_of_rooms`, `occupied_rooms` | Calculate `(occupied_rooms / number_of_rooms) × 100` when `number_of_rooms` is greater than zero. | `room_type_occupancy_rate` | Supports analysis of occupancy by room type. |
+| B-08 | `report_year`, `report_month`, `establishment_id`, `total_visitors` | Group valid visitor reports by year, month, and establishment. Sum `total_visitors`. | `monthly_visitors` | Summarizes visitor counts per establishment for monthly reporting. |
+| B-09 | `report_year`, `report_month`, `establishment_id`, `occupied_rooms`, `total_rooms` | Group accommodation reports by year, month, and establishment. Aggregate occupied rooms and total rooms using sums, then calculate the monthly occupancy rate from the aggregated values. | `monthly_occupied_rooms`, `monthly_total_rooms`, `monthly_occupancy_rate` | Provides monthly accommodation and room utilization summaries. |
+| B-10 | `report_year`, `report_month`, `municipality`, `province`, `country`, `total_visitors` | Group visitor records by year, month, and visitor origin. Sum `total_visitors`. | `monthly_visitors_by_origin` | Identifies visitor origins and supports monthly origin comparisons. |
+| B-11 | `total_rooms`, `occupied_rooms`, `number_of_rooms` | Exclude records with invalid negative counts or occupied rooms exceeding the corresponding total rooms. Count and log each exclusion with its reason. | Filtered business-ready records | Prevents invalid occupancy data from affecting tourism reports. |
+| B-12 | `report_date`, `establishment_id` | Exclude records identified as invalid or ineligible under approved business rules. Record the number of excluded records and the reason. | Filtered business-ready records | Ensures reports use eligible and verified tourism data. |
+
+### 5.2 Joins and Aggregations
+
+Visitor reports are joined with establishment records using `establishment_id`. Accommodation reports are joined with establishment records using the same key, while room occupancy details are linked to accommodation reports through `accommodation_report_id`. These relationships provide establishment and room-level context for tourism analysis.
+
+Monthly visitor summaries are grouped by reporting year, reporting month, and establishment. Visitor-origin summaries are grouped by reporting year, reporting month, and origin. Monthly accommodation summaries use the reporting year, reporting month, and establishment as grouping keys. Counts are aggregated using `SUM()`. Occupancy rates are calculated from aggregated occupied-room and total-room counts rather than averaging individual report percentages.
+
+Records without valid matching parent records are excluded from the corresponding business-ready output and logged. They are not silently deleted from the extracted source data.
+
+### 5.3 Filtering and Conditional Logic
+
+Only records that pass the cleaning rules and satisfy the applicable business conditions are included in the transformed output. Negative visitor counts, invalid room counts, occupied rooms exceeding total rooms, and records with unresolved required relationships are excluded and logged with the relevant rule ID and reason.
+
+Occupancy rates are calculated only when the applicable total-room value is greater than zero. When the denominator is zero, the occupancy rate is left as `NULL` and the condition is logged rather than dividing by zero or reporting an inaccurate percentage.
+
+No cancellation or other exclusion status is assumed because such a field is not included in the documented source schema. If additional business exclusions are established, they must be applied during this stage and their counts and reasons recorded.
+
+### 5.4 Dimensional Modeling
+
+The pipeline may organize the transformed data into dimensions and fact tables if dimensional modeling is required by the implementation. A possible structure includes `dim_establishment`, `dim_date`, `fact_visitor_reports`, and `fact_accommodation_reports`. Dimension tables describe establishments and dates, while fact tables store visitor and accommodation measurements.
+
+Surrogate keys may be generated for dimension records when required by the selected target schema. The establishment's source UUID can be retained as a business key for traceability. Changes to establishment attributes should follow the approved update policy; historical versions should only be maintained if Slowly Changing Dimension Type 2 is implemented. These dimensional structures are proposed unless they are already part of the actual pipeline implementation.
+
+### 5.5 Business Transformation Output
+
+The transformed datasets are intended to support daily monitoring, monthly tourism reports, visitor-origin analysis, and accommodation occupancy analysis. Each transformation must be traceable through its rule ID, input data, output columns, and logged exclusions or failures. The resulting datasets are passed to the next pipeline stage for loading or storage according to the project's configured target database.
