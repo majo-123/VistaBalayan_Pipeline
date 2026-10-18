@@ -264,48 +264,22 @@ The metadata and logs will be used for:
 
 # 5. Log Retention and Access
 
-## 5.1 Log Retention Period
+Extraction logs will be retained for at least 30 days after each extraction run. This period provides sufficient time to review extraction activities, troubleshoot errors, monitor pipeline execution, verify extracted records, and support recovery when extraction failures occur.
 
-**Operational log retention:** 1 year.
-
-The retention period provides sufficient history for troubleshooting extraction problems, reviewing pipeline runs, and supporting operational monitoring.
+Logs must not be deleted before the 30-day retention period has elapsed or while they are still required for troubleshooting, auditing, recovery, or ongoing investigations.
 
 
-## 5.2 Storage Location
+| **Requirement** | **Specification** |
+|---|---|
+| Log Retention Period | At least 30 days after each extraction run. |
+| Justification | Allows recent extraction runs to be reviewed for troubleshooting, auditing, recovery, and verification of extraction results. |
+| Storage Location | Project-controlled storage designated for ETL pipeline logs. The exact storage location will be finalized based on the project's implemented configuration. |
+| Access Permissions | Access limited to authorized project team members responsible for pipeline maintenance, system administration, and troubleshooting. Public users will not have access to internal extraction logs. |
+| Archiving Requirements | Logs required for ongoing investigations, unresolved extraction errors, or audits may be retained beyond the standard retention period when necessary. Archived logs must remain protected from unauthorized access or modification. |
+| Deletion Rules | Logs must not be deleted before the end of the defined retention period or while they are still required for troubleshooting, auditing, recovery, or investigation of extraction failures. |
+| Responsible Process | The designated ETL or project administrator will be responsible for monitoring log retention, managing necessary archives, and overseeing authorized deletion. |
 
-Extraction metadata and operational logs should be stored in a controlled database table or designated pipeline logging storage associated with the VistaBalayan data pipeline.
-
-The exact production logging location is not specified in the current technical metadata and must be finalized during implementation.
-
-## 5.3 Access Permissions
-
-Access to extraction logs should be limited to authorized personnel responsible for:
-
-- Data pipeline maintenance
-- System administration
-- Data engineering
-- Municipal tourism system administration
-
-Public users should not have access to internal extraction logs.
-
-## 5.4 Archiving
-
-Logs that reach the end of their active retention period may be archived when required for auditing or operational history.
-
-Archived logs must remain protected from unauthorized modification.
-
-## 5.5 Deletion Rules
-
-Operational logs must not be deleted before the defined retention period.
-
-Logs must also be retained while they are required for:
-
-- Troubleshooting
-- Auditing
-- Recovery
-- Investigation of failed extraction runs
-
-Deletion should occur only through an authorized retention process.
+Operational extraction logs will follow the defined minimum retention period of 30 days. Audit records required for longer-term review may be retained beyond this period when necessary. Actual storage, access, archiving, and deletion procedures will follow the project's implemented configuration. These measures are intended to maintain the availability and traceability of extraction records and support the reliability of the data extraction process.
 
 ---
 
