@@ -127,3 +127,65 @@ The following table identifies the data quality issues that should be examined i
 | `room_occupancy_details.csv` | `accommodation_report_id` | Invalid reference values | An ID that does not exist in `accommodation_reports.csv` | 0–2% (estimated) | Validate the relationship between room occupancy details and accommodation reports under Section 3. |
 | `room_occupancy_details.csv` | `number_of_rooms`, `occupied_rooms`, `check_ins`, `guest_nights` | Invalid numeric values | Negative room count or decimal check-in count | 1–3% (estimated) | Convert values to integers, validate nonnegative counts, and flag invalid records under Sections 3 and 4. |
 
+
+
+# 3. Data Cleaning Rules
+
+Data cleaning is performed after profiling the extracted VistaBalayan tourism datasets to identify and address data quality issues before standardization and transformation. The cleaning process focuses on missing values, duplicate records, inconsistent text, invalid numeric values, and orphan records that may affect the accuracy and reliability of tourism data analytics.
+
+The cleaning rules apply to the extracted `establishments.csv`, `visitor_reports.csv`, `accommodation_reports.csv`, and `room_occupancy_details.csv` files. Each rule is assigned a unique Rule ID to support traceability, monitoring, and documentation. The issues listed below correspond to the potential issues identified in Section 2 and must be confirmed against actual profiling results before being reported as detected findings.
+
+## 3.1 Data Cleaning Rules Table
+
+| Rule ID and Name | Target — Table and Column | Condition | Action | Justification |
+|---|---|---|---|---|
+| C-01: Trim Whitespace | All datasets — text columns | A text value contains leading or trailing spaces. | Remove leading and trailing whitespace from text values. Preserve meaningful spaces within names and descriptions. | Prevents inconsistent values and improves matching, grouping, and filtering. |
+| C-02: Handle Missing Establishment Names | `establishments.name` | The establishment name is null, empty, or contains only whitespace. | Reject the record from the clean dataset and send it to quarantine for review. Do not assign a fabricated establishment name. | The establishment name is required to identify and manage an establishment correctly. |
+| C-03: Handle Missing Establishment Types | `establishments.type` | The establishment type is null, empty, or contains only whitespace. | Quarantine the record for correction instead of assigning an unsupported type. | Establishment type is required for consistent classification and tourism reporting. |
+| C-04: Detect Duplicate Establishment IDs | `establishments.id` | The same UUID appears in multiple records. | Keep one record only when the duplicate records are identical. If conflicting records share the same ID, quarantine the conflicting records for review rather than automatically choosing one. Log the duplicate count and affected IDs. | Ensures that each establishment has a unique identifier without discarding potentially important differences. |
+| C-05: Detect Duplicate Visitor Reports | `visitor_reports.id` | The same report UUID appears more than once. | Keep one copy if all relevant fields are identical. If the records conflict, quarantine them for review. Log all duplicate detections. | Prevents duplicate reports from inflating visitor totals and affecting analytics. |
+| C-06: Validate Visitor Report Dates | `visitor_reports.report_date` | The date is missing or cannot be parsed as a valid date. | Quarantine records with missing or invalid dates. Convert valid, recognizable date formats during standardization under Section 4. | A valid report date is necessary for time-based summaries and trend analysis. |
+| C-07: Validate Visitor Counts | `visitor_reports.male_visitors`, `visitor_reports.female_visitors`, `visitor_reports.total_visitors` | A count is negative, fractional, or nonnumeric. | Convert valid whole-number representations to integers. Quarantine invalid values for correction. Do not automatically replace invalid counts with zero. | Prevents inaccurate visitor totals and avoids treating unknown values as confirmed zero counts. |
+| C-08: Check Visitor Count Consistency | `visitor_reports.male_visitors`, `visitor_reports.female_visitors`, `visitor_reports.total_visitors` | All three values are present, but `total_visitors` does not equal `male_visitors + female_visitors`. | Flag the record for validation and quarantine it if the discrepancy cannot be resolved using an approved correction process. Log the discrepancy. | Helps maintain consistency between the reported visitor total and its gender-based breakdown. |
+| C-09: Validate Visitor Report Establishment References | `visitor_reports.establishment_id` | The establishment ID is missing or does not match an existing `establishments.id`. | Quarantine the orphan report until the correct establishment reference is confirmed. Do not delete it silently. | Ensures visitor reports are associated with valid establishments. |
+| C-10: Validate Accommodation Report Dates | `accommodation_reports.report_date` | The report date is missing or invalid. | Quarantine the record for correction. Convert valid dates to the required format under Section 4. | Accurate dates are necessary for accommodation monitoring and periodic reports. |
+| C-11: Validate Accommodation Counts | `accommodation_reports.total_rooms`, `accommodation_reports.occupied_rooms`, `accommodation_reports.guest_check_ins`, `accommodation_reports.guest_nights`, `accommodation_reports.foreign_guest_check_ins`, `accommodation_reports.foreign_guest_nights` | A count is negative, fractional, or nonnumeric. | Convert valid whole-number representations to integers. Quarantine invalid values for review rather than replacing them with zero. | Ensures that room occupancy and guest activity statistics remain reliable. |
+| C-12: Check Occupied Rooms Against Total Rooms | `accommodation_reports.total_rooms`, `accommodation_reports.occupied_rooms` | `occupied_rooms` exceeds `total_rooms`, or the room counts are otherwise logically inconsistent. | Flag the record for review. Quarantine it if the inconsistency cannot be resolved using the source report. | Prevents impossible or misleading room occupancy calculations. |
+| C-13: Validate Accommodation Report Establishment References | `accommodation_reports.establishment_id` | The establishment ID is missing or does not match an existing `establishments.id`. | Quarantine the orphan report until the establishment reference is verified. Record the affected ID and reason. | Maintains referential integrity between establishments and accommodation reports. |
+| C-14: Validate Room Occupancy Details References | `room_occupancy_details.accommodation_report_id` | The accommodation report ID is missing or does not match an existing `accommodation_reports.id`. | Quarantine the orphan room occupancy record until its parent report is identified. | Prevents room occupancy details from being associated with nonexistent accommodation reports. |
+| C-15: Validate Room Occupancy Counts | `room_occupancy_details.number_of_rooms`, `room_occupancy_details.occupied_rooms`, `room_occupancy_details.check_ins`, `room_occupancy_details.guest_nights` | A count is negative, fractional, or nonnumeric. | Convert valid whole-number representations to integers. Quarantine invalid values for correction. | Ensures that room-level statistics are suitable for aggregation and analysis. |
+| C-16: Check Occupied Rooms by Room Type | `room_occupancy_details.number_of_rooms`, `room_occupancy_details.occupied_rooms` | `occupied_rooms` exceeds `number_of_rooms`. | Flag the record for review and quarantine it if the source data cannot resolve the discrepancy. | Prevents room occupancy figures from exceeding the available rooms for a room type. |
+| C-17: Standardize Text Whitespace and Invalid Characters | All datasets — text columns | Text contains control characters or invalid characters that are not appropriate for the field. | Remove unnecessary control characters and normalize whitespace. Preserve valid punctuation and characters in establishment names and location values. Quarantine values when the intended content cannot be determined safely. | Improves data consistency without damaging meaningful names or location information. |
+| C-18: Validate Establishment Room Counts | `establishments.total_rooms` | The value is negative, fractional, or nonnumeric. | Convert valid whole-number representations to integers. Quarantine invalid values for review. | Ensures that establishment capacity information is valid for accommodation analysis. |
+
+## 3.2 Missing and Null Value Handling
+
+Missing values are handled according to the purpose and requirements of each field. Required identifiers, establishment names, establishment types, and report dates must not be replaced with invented values. Records missing these required fields are quarantined for review.
+
+For count fields, a value of zero is valid only when the source data explicitly indicates that no visitors, rooms, check-ins, or guest nights were recorded. Null values must not automatically be converted to zero because a missing value may indicate incomplete reporting rather than the absence of activity.
+
+Optional location fields, such as `municipality`, `province`, and `country`, may remain null when the information is unavailable. If a later transformation requires these fields, the pipeline must use an approved reference or mark the value as unknown without inventing a location.
+
+## 3.3 Duplicate Detection and Record Retention
+
+Duplicate detection is performed using the primary identifier of each dataset: `establishments.id`, `visitor_reports.id`, `accommodation_reports.id`, and `room_occupancy_details.id`.
+
+When duplicate records have identical values across all relevant fields, the pipeline retains one copy and records the number of duplicate records removed. When records share an identifier but contain conflicting information, the pipeline does not automatically select the latest record because the documented source schema does not establish a reliable update timestamp for these datasets. Conflicting records are quarantined for review.
+
+Records with different IDs are not automatically treated as duplicates merely because their other values are similar. Any additional business-level duplicate detection must use a documented rule and be verified before records are removed.
+
+## 3.4 Invalid Values and Orphan Records
+
+Invalid values include negative counts, fractional values in whole-number fields, unparseable dates, and logically inconsistent room or visitor counts. The pipeline validates these values and quarantines records that cannot be corrected safely. Valid values are retained and converted according to the standardization rules in Section 4.
+
+Orphan records are records whose foreign-key values do not match an existing parent record. Visitor reports and accommodation reports must reference a valid establishment. Room occupancy details must reference a valid accommodation report. The pipeline quarantines orphan records until the reference can be verified or corrected. It must not create missing parent records or silently delete orphan records.
+
+## 3.5 Cleaning Audit Trail and Logging
+
+Every cleaning operation must be traceable. The pipeline records the rule ID, source dataset, affected record identifier when available, issue detected, action taken, processing timestamp, and processing outcome. Counts of records retained, corrected, quarantined, or removed must be maintained for reporting.
+
+Records rejected from the clean output must be retained in a quarantine location or an equivalent recoverable record store. Duplicate removals must also be counted and logged. No record may be silently dropped during cleaning. Detailed logging requirements and processing metrics are documented in Sections 7 and 8.
+
+## 3.6 Relationship to Data Profiling
+
+The cleaning rules in this section are intended to address the potential issues described in Section 2. Before finalizing the pipeline, the data profiling process must confirm which issues actually exist in the extracted datasets. Rules that are not triggered should be recorded as checks performed with zero affected records, where applicable. Actual counts and percentages must be calculated from profiling and cleaning logs rather than estimated.
