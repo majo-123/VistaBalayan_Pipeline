@@ -102,32 +102,34 @@ The stage performs profiling, column normalization, whitespace cleanup, date sta
 - No target database, warehouse, dimensional model, or surrogate-key load is created in this stage.
 
 
-# 2. Data Profiling and Issue Identification
+## 2. Data Profiling and Issue Identification
 
-Data profiling is performed on the data extracted from the VistaBalayan Tourism System before applying standardization and transformation rules. The profiling process examines the four source datasets: `establishments`, `visitor_reports`, `accommodation_reports`, and `room_occupancy_details`.
+Before defining the cleaning and transformation rules, the extracted data from the VistaBalayan Tourism System is examined to identify potential data quality issues. The profiling process covers the four source datasets: `establishments`, `visitor_reports`, `accommodation_reports`, and `room_occupancy_details`.
 
-The purpose is to identify potential data quality issues, including missing values, duplicate records, inconsistent formats, invalid business values, and incorrect data types. Each identified issue is documented with its affected table and column, a sample value, the number or percentage of affected records, and the planned treatment based on the rules defined in the succeeding sections.
+The purpose of data profiling is to identify issues involving missing values, duplicate identifiers, inconsistent formats, invalid numeric values, and incorrect relationships between datasets. These findings help determine the appropriate cleaning, standardization, validation, or rejection procedures to be applied before the data proceeds to the Load stage.
 
-## 2.1 Data Profiling and Issue Identification Table
+For each identified or anticipated issue, the affected table and column, issue type, sample value, approximate percentage of affected records, and planned treatment are documented. Since the percentages below are preliminary estimates rather than measured profiling results, they should be updated when actual profiling results become available. The rule references should correspond to the specific rules documented in Sections 3, 4, and 5.
 
-The following table identifies the data quality issues that should be examined in the extracted VistaBalayan datasets. The examples are illustrative and must be verified against the actual extracted records. Affected record counts and percentages must be completed after profiling.
+### 2.1 Data Profiling and Issue Identification Table
 
-| Table or File | Column Affected | Issue Type | Example of the Issue | Estimated Affected Records | Planned Treatment |
+| Table or File | Column Affected | Issue Type | Example of the Issue | Approximate Affected Records | Planned Treatment |
 |---|---|---|---|---|---|
-| `establishments.csv` | `name` | Missing values | Empty or null establishment name | 1–3% (estimated) | Apply the required-field validation rule in Section 3. Records with missing establishment names will be flagged for review. |
+| `establishments.csv` | `name` | Missing values | Empty or null establishment name | 1–3% (estimated) | Flag records with missing required names for review or quarantine according to the required-field validation rule in Section 3. |
 | `establishments.csv` | `type` | Inconsistent formats | `Hotel`, `HOTEL`, `hotel` | 5–10% (estimated) | Standardize text casing and map establishment types to consistent reference values under Section 4. |
 | `establishments.csv` | `id` | Duplicate values | The same UUID appears more than once | 0–1% (estimated) | Check identifier uniqueness and flag duplicate records for investigation under Section 3. |
-| `visitor_reports.csv` | `report_date` | Inconsistent date formats | `2026/10/18`, `2026-10-18` | 1–5% (estimated) | Convert valid dates to ISO 8601 format (`YYYY-MM-DD`) under Section 4. |
-| `visitor_reports.csv` | `male_visitors`, `female_visitors`, `total_visitors` | Invalid numeric values | `-5`, `2.5`, `abc` | 1–3% (estimated) | Convert values to integers and validate that visitor counts are nonnegative. Flag invalid records under Sections 3 and 4. |
-| `visitor_reports.csv` | `establishment_id` | Invalid reference values | An ID that does not exist in `establishments.csv` | 0–2% (estimated) | Validate establishment references and flag unmatched IDs for review under Section 3. |
-| `visitor_reports.csv` | `municipality`, `province`, `country` | Inconsistent text formats | `Balayan`, `BALAYAN`, `balayan` | 5–15% (estimated) | Standardize text formatting and apply reference-value mappings where applicable under Section 4. |
-| `accommodation_reports.csv` | `total_rooms`, `occupied_rooms`, `guest_check_ins`, `guest_nights` | Invalid numeric values | Negative counts or non-integer values | 1–3% (estimated) | Convert values to integers and validate nonnegative counts. Flag invalid records under Sections 3 and 4. |
-| `accommodation_reports.csv` | `report_date` | Missing values | Empty report date | 1–3% (estimated) | Validate required dates and flag records with missing dates for review under Sections 3 and 4. |
-| `room_occupancy_details.csv` | `room_type` | Inconsistent text formats | `Deluxe`, `DELUXE`, `deluxe` | 5–10% (estimated) | Standardize room-type labels using consistent casing and reference values under Section 4. |
-| `room_occupancy_details.csv` | `accommodation_report_id` | Invalid reference values | An ID that does not exist in `accommodation_reports.csv` | 0–2% (estimated) | Validate the relationship between room occupancy details and accommodation reports under Section 3. |
-| `room_occupancy_details.csv` | `number_of_rooms`, `occupied_rooms`, `check_ins`, `guest_nights` | Invalid numeric values | Negative room count or decimal check-in count | 1–3% (estimated) | Convert values to integers, validate nonnegative counts, and flag invalid records under Sections 3 and 4. |
+| `visitor_reports.csv` | `report_date` | Mixed date formats | `2026/10/18`, `2026-10-18` | 1–5% (estimated) | Standardize valid dates to ISO 8601 format (`YYYY-MM-DD`) under Section 4. |
+| `visitor_reports.csv` | `male_visitors`, `female_visitors`, `total_visitors` | Invalid numeric values | `-5`, `2.5`, `abc` | 1–3% (estimated) | Validate integer and nonnegative count requirements; flag invalid records under Sections 3 and 4. |
+| `visitor_reports.csv` | `establishment_id` | Invalid foreign-key reference | An ID that does not exist in `establishments.csv` | 0–2% (estimated) | Validate establishment references and flag unmatched IDs under Section 3. |
+| `visitor_reports.csv` | `municipality`, `province`, `country`, if present | Inconsistent formats | `Balayan`, `BALAYAN`, `balayan` | 5–15% (estimated) | Standardize text formatting and apply reference-value mappings where applicable under Section 4. |
+| `accommodation_reports.csv` | `total_rooms`, `occupied_rooms`, `guest_check_ins`, `guest_nights`, if present | Invalid numeric values | Negative counts or decimal values where integers are required | 1–3% (estimated) | Validate numeric types and nonnegative count requirements; flag invalid records under Sections 3 and 4. |
+| `accommodation_reports.csv` | `report_date` | Missing or invalid values | Empty report date or an unparseable date | 1–3% (estimated) | Apply required-field and date validation under Sections 3 and 4. |
+| `room_occupancy_details.csv` | `room_type` | Inconsistent formats | `Deluxe`, `DELUXE`, `deluxe` | 5–10% (estimated) | Standardize room-type labels while preserving their intended meaning under Section 4. |
+| `room_occupancy_details.csv` | `accommodation_report_id` | Invalid foreign-key reference | An ID that does not exist in `accommodation_reports.csv` | 0–2% (estimated) | Validate the relationship between room occupancy details and accommodation reports under Section 3. |
+| `room_occupancy_details.csv` | `number_of_rooms`, `occupied_rooms`, `check_ins`, `guest_nights`, if present | Invalid numeric values | Negative room counts or decimal check-in counts where integers are required | 1–3% (estimated) | Validate numeric types and nonnegative count requirements under Sections 3 and 4. |
 
+The estimated percentages provide preliminary targets for identifying and discussing possible data quality issues. They do not represent confirmed defects in the extracted records. During implementation, the profiling results should be used to replace these estimates with observed counts or percentages.
 
+The identified issues will guide the cleaning rules in Section 3, the standardization and transformation rules in Section 4, and the validation and reconciliation procedures in Section 5. Records that cannot be corrected reliably should be flagged, rejected, or quarantined according to the applicable rules.
 
 # 3. Data Cleaning Rules
 
@@ -137,75 +139,60 @@ The cleaning rules apply to the extracted `establishments.csv`, `visitor_reports
 
 ## 3.1 Data Cleaning Rules Table
 
-| Rule ID and Name | Target — Table and Column | Condition | Action | Justification |
+| Rule ID and Name | Target | Condition | Action | Justification |
 |---|---|---|---|---|
-| C-01: Trim Whitespace | All datasets — text columns | A text value contains leading or trailing spaces. | Remove leading and trailing whitespace from text values. Preserve meaningful spaces within names and descriptions. | Prevents inconsistent values and improves matching, grouping, and filtering. |
-| C-02: Handle Missing Establishment Names | `establishments.name` | The establishment name is null, empty, or contains only whitespace. | Reject the record from the clean dataset and send it to quarantine for review. Do not assign a fabricated establishment name. | The establishment name is required to identify and manage an establishment correctly. |
-| C-03: Handle Missing Establishment Types | `establishments.type` | The establishment type is null, empty, or contains only whitespace. | Quarantine the record for correction instead of assigning an unsupported type. | Establishment type is required for consistent classification and tourism reporting. |
-| C-04: Detect Duplicate Establishment IDs | `establishments.id` | The same UUID appears in multiple records. | Keep one record only when the duplicate records are identical. If conflicting records share the same ID, quarantine the conflicting records for review rather than automatically choosing one. Log the duplicate count and affected IDs. | Ensures that each establishment has a unique identifier without discarding potentially important differences. |
-| C-05: Detect Duplicate Visitor Reports | `visitor_reports.id` | The same report UUID appears more than once. | Keep one copy if all relevant fields are identical. If the records conflict, quarantine them for review. Log all duplicate detections. | Prevents duplicate reports from inflating visitor totals and affecting analytics. |
-| C-06: Validate Visitor Report Dates | `visitor_reports.report_date` | The date is missing or cannot be parsed as a valid date. | Quarantine records with missing or invalid dates. Convert valid, recognizable date formats during standardization under Section 4. | A valid report date is necessary for time-based summaries and trend analysis. |
-| C-07: Validate Visitor Counts | `visitor_reports.male_visitors`, `visitor_reports.female_visitors`, `visitor_reports.total_visitors` | A count is negative, fractional, or nonnumeric. | Convert valid whole-number representations to integers. Quarantine invalid values for correction. Do not automatically replace invalid counts with zero. | Prevents inaccurate visitor totals and avoids treating unknown values as confirmed zero counts. |
-| C-08: Check Visitor Count Consistency | `visitor_reports.male_visitors`, `visitor_reports.female_visitors`, `visitor_reports.total_visitors` | All three values are present, but `total_visitors` does not equal `male_visitors + female_visitors`. | Flag the record for validation and quarantine it if the discrepancy cannot be resolved using an approved correction process. Log the discrepancy. | Helps maintain consistency between the reported visitor total and its gender-based breakdown. |
-| C-09: Validate Visitor Report Establishment References | `visitor_reports.establishment_id` | The establishment ID is missing or does not match an existing `establishments.id`. | Quarantine the orphan report until the correct establishment reference is confirmed. Do not delete it silently. | Ensures visitor reports are associated with valid establishments. |
-| C-10: Validate Accommodation Report Dates | `accommodation_reports.report_date` | The report date is missing or invalid. | Quarantine the record for correction. Convert valid dates to the required format under Section 4. | Accurate dates are necessary for accommodation monitoring and periodic reports. |
-| C-11: Validate Accommodation Counts | `accommodation_reports.total_rooms`, `accommodation_reports.occupied_rooms`, `accommodation_reports.guest_check_ins`, `accommodation_reports.guest_nights`, `accommodation_reports.foreign_guest_check_ins`, `accommodation_reports.foreign_guest_nights` | A count is negative, fractional, or nonnumeric. | Convert valid whole-number representations to integers. Quarantine invalid values for review rather than replacing them with zero. | Ensures that room occupancy and guest activity statistics remain reliable. |
-| C-12: Check Occupied Rooms Against Total Rooms | `accommodation_reports.total_rooms`, `accommodation_reports.occupied_rooms` | `occupied_rooms` exceeds `total_rooms`, or the room counts are otherwise logically inconsistent. | Flag the record for review. Quarantine it if the inconsistency cannot be resolved using the source report. | Prevents impossible or misleading room occupancy calculations. |
-| C-13: Validate Accommodation Report Establishment References | `accommodation_reports.establishment_id` | The establishment ID is missing or does not match an existing `establishments.id`. | Quarantine the orphan report until the establishment reference is verified. Record the affected ID and reason. | Maintains referential integrity between establishments and accommodation reports. |
-| C-14: Validate Room Occupancy Details References | `room_occupancy_details.accommodation_report_id` | The accommodation report ID is missing or does not match an existing `accommodation_reports.id`. | Quarantine the orphan room occupancy record until its parent report is identified. | Prevents room occupancy details from being associated with nonexistent accommodation reports. |
-| C-15: Validate Room Occupancy Counts | `room_occupancy_details.number_of_rooms`, `room_occupancy_details.occupied_rooms`, `room_occupancy_details.check_ins`, `room_occupancy_details.guest_nights` | A count is negative, fractional, or nonnumeric. | Convert valid whole-number representations to integers. Quarantine invalid values for correction. | Ensures that room-level statistics are suitable for aggregation and analysis. |
-| C-16: Check Occupied Rooms by Room Type | `room_occupancy_details.number_of_rooms`, `room_occupancy_details.occupied_rooms` | `occupied_rooms` exceeds `number_of_rooms`. | Flag the record for review and quarantine it if the source data cannot resolve the discrepancy. | Prevents room occupancy figures from exceeding the available rooms for a room type. |
-| C-17: Standardize Text Whitespace and Invalid Characters | All datasets — text columns | Text contains control characters or invalid characters that are not appropriate for the field. | Remove unnecessary control characters and normalize whitespace. Preserve valid punctuation and characters in establishment names and location values. Quarantine values when the intended content cannot be determined safely. | Improves data consistency without damaging meaningful names or location information. |
-| C-18: Validate Establishment Room Counts | `establishments.total_rooms` | The value is negative, fractional, or nonnumeric. | Convert valid whole-number representations to integers. Quarantine invalid values for review. | Ensures that establishment capacity information is valid for accommodation analysis. |
+| C-01: Trim Whitespace | All text columns in all four datasets | A text value contains leading or trailing whitespace. | Remove leading and trailing whitespace while preserving meaningful internal spaces. | Prevents mismatches during comparisons, filtering, and record matching. |
+| C-02: Required Establishment Name | `establishments.name` | The establishment name is missing, null, or blank after trimming. | Reject the affected record to quarantine for review. | An establishment name is necessary to identify and manage tourism establishments. |
+| C-03: Required Establishment Type | `establishments.type` | The establishment type is missing, null, or blank after trimming. | Reject the affected record to quarantine for review. | Establishment type supports tourism categorization and reporting. |
+| C-04: Duplicate Establishment ID | `establishments.id` | Multiple records share the same establishment ID. | If the records are identical, retain one record and count the duplicate copies removed. If values conflict, quarantine the conflicting records for review. | Prevents duplicate establishment entries without arbitrarily discarding conflicting information. |
+| C-05: Duplicate Visitor Report ID | `visitor_reports.id` | Multiple records share the same visitor report ID. | Retain one copy when duplicate records are identical. Quarantine conflicting records instead of automatically choosing one. | Maintains report uniqueness and prevents inaccurate visitor totals. |
+| C-06: Required Visitor Report Date | `visitor_reports.report_date` | The report date is missing, null, blank, or invalid. | Quarantine the affected record if the date cannot be reliably recovered from the source. | A valid reporting date is necessary for chronological analysis and period-based reports. |
+| C-07: Invalid Visitor Counts | Visitor count columns in `visitor_reports`, including total, male, and female visitor counts | A count is negative, nonnumeric, or contains a fractional value when only whole visitors are permitted. | Correct only when the source representation can be safely interpreted as a valid whole number. Otherwise, quarantine the record. Do not replace missing or invalid counts with zero automatically. | Prevents inaccurate visitor totals and avoids inventing values not supported by the source data. |
+| C-08: Visitor Count Consistency | Total, male, and female visitor count columns in `visitor_reports` | All relevant counts are present, but the total does not equal the male count plus the female count. | Flag the record for review and quarantine it if the inconsistency cannot be resolved using the source data. | Helps ensure that reported visitor totals are internally consistent. |
+| C-09: Orphan Visitor Report | `visitor_reports.establishment_id` | The establishment ID is missing or does not match an existing `establishments.id`. | Quarantine the affected visitor report and log the unmatched foreign key. | Ensures each visitor report is associated with a valid establishment. |
+| C-10: Required Accommodation Report Date | `accommodation_reports.report_date` | The report date is missing, null, blank, or invalid. | Quarantine the affected record if the date cannot be reliably recovered from the source. | Enables accurate accommodation reporting and time-based analysis. |
+| C-11: Invalid Accommodation Counts | `accommodation_reports.total_rooms`, `occupied_rooms`, `guest_check_ins`, `guest_nights`, `foreign_guest_check_ins`, and `foreign_guest_nights` | A count is negative, nonnumeric, or fractional when a whole-number value is required. | Correct safely interpretable values; otherwise, quarantine the affected record. Do not silently substitute zero. | Prevents invalid accommodation figures from affecting occupancy and visitor analysis. |
+| C-12: Accommodation Count Consistency | `accommodation_reports.total_rooms` and `occupied_rooms` | Occupied rooms exceed total rooms, or the values are otherwise inconsistent. | Flag the record and quarantine it if the inconsistency cannot be resolved from the source data. | Prevents implausible room occupancy figures from affecting tourism analytics. |
+| C-13: Orphan Accommodation Report | `accommodation_reports.establishment_id` | The establishment ID is missing or does not match an existing `establishments.id`. | Quarantine the affected accommodation report and log the unmatched foreign key. | Ensures accommodation reports are linked to valid establishments. |
+| C-14: Orphan Room Occupancy Record | `room_occupancy_details.accommodation_report_id` | The accommodation report ID is missing or does not match an existing `accommodation_reports.id`. | Quarantine the affected room occupancy record and log the unmatched foreign key. | Maintains referential integrity between room occupancy details and their parent reports. |
+| C-15: Invalid Room Occupancy Counts | `room_occupancy_details.number_of_rooms`, `occupied_rooms`, `check_ins`, and `guest_nights` | A count is negative, nonnumeric, or fractional when a whole-number value is required. | Correct safely interpretable values; otherwise, quarantine the affected record. | Ensures room occupancy data contains valid count values for analysis. |
+| C-16: Room Occupancy Consistency | `room_occupancy_details.number_of_rooms` and `occupied_rooms` | The occupied room count exceeds the total number of rooms recorded for the same detail. | Flag the record and quarantine it if the inconsistency cannot be resolved from the source data. | Prevents inconsistent room-level figures from distorting occupancy analysis. |
+| C-17: Invalid Characters and Whitespace | All text columns in all four datasets | Text contains unwanted control characters or irregular whitespace that interferes with processing. | Remove inappropriate control characters and normalize whitespace where safe. Preserve valid letters, punctuation, and meaningful characters. Quarantine ambiguous values that cannot be corrected safely. | Improves data consistency without damaging legitimate establishment names or other text values. |
+| C-18: Invalid Establishment Room Count | `establishments.total_rooms` | The room count is negative, nonnumeric, or fractional when a whole-number value is required. | Correct safely interpretable values; otherwise, quarantine the affected record. | Ensures establishment room capacity is suitable for accommodation-related analysis. |
 
-## 3.2 Missing and Null Value Handling
+### 3.2 Handling Missing and Null Values
 
-Missing values are handled according to the purpose and requirements of each field. Required identifiers, establishment names, establishment types, and report dates must not be replaced with invented values. Records missing these required fields are quarantined for review.
+Missing values are handled according to the purpose and requirements of each field. Required fields, such as establishment names, establishment types, and report dates, must contain valid information. Records with missing required values should be quarantined when the missing information cannot be reliably recovered.
 
-For count fields, a value of zero is valid only when the source data explicitly indicates that no visitors, rooms, check-ins, or guest nights were recorded. Null values must not automatically be converted to zero because a missing value may indicate incomplete reporting rather than the absence of activity.
+Optional fields, such as `municipality`, `province`, and `country`, may remain null when the source does not provide the information and the field is not required for processing. Missing values must not automatically be replaced with zero, an empty string, or an assumed value because doing so could misrepresent the original tourism data.
 
-Optional location fields, such as `municipality`, `province`, and `country`, may remain null when the information is unavailable. If a later transformation requires these fields, the pipeline must use an approved reference or mark the value as unknown without inventing a location.
+### 3.3 Duplicate Detection and Removal
 
-## 3.3 Duplicate Detection and Record Retention
+Duplicate detection uses the primary identifiers of each dataset: `establishments.id`, `visitor_reports.id`, `accommodation_reports.id`, and the primary identifier of `room_occupancy_details`.
 
-Duplicate detection is performed using the primary identifier of each dataset: `establishments.id`, `visitor_reports.id`, `accommodation_reports.id`, and `room_occupancy_details.id`.
+When records have the same identifier and identical values, one copy is retained and the number of duplicate copies removed is recorded. When records share an identifier but contain conflicting values, the pipeline must not arbitrarily select the latest record unless a reliable update timestamp and an approved selection rule are available. Conflicting records should be quarantined for review.
 
-When duplicate records have identical values across all relevant fields, the pipeline retains one copy and records the number of duplicate records removed. When records share an identifier but contain conflicting information, the pipeline does not automatically select the latest record because the documented source schema does not establish a reliable update timestamp for these datasets. Conflicting records are quarantined for review.
+Records with different identifiers must not be treated as duplicates solely because some of their field values are similar.
 
-Records with different IDs are not automatically treated as duplicates merely because their other values are similar. Any additional business-level duplicate detection must use a documented rule and be verified before records are removed.
+### 3.4 Invalid Values and Orphan Records
 
-## 3.4 Invalid Values and Orphan Records
+Invalid values are evaluated according to the expected meaning of each field. Counts must be valid, nonnegative whole numbers where applicable, and room occupancy values must satisfy the relevant consistency checks. Values that can be safely interpreted may be corrected; values that remain invalid must be flagged and quarantined.
 
-Invalid values include negative counts, fractional values in whole-number fields, unparseable dates, and logically inconsistent room or visitor counts. The pipeline validates these values and quarantines records that cannot be corrected safely. Valid values are retained and converted according to the standardization rules in Section 4.
+Orphan records are records whose foreign keys do not match an existing parent record. These include visitor reports and accommodation reports without a matching establishment, as well as room occupancy details without a matching accommodation report. The pipeline must not create missing parent records or silently delete orphan records. Each affected record must be counted, logged, and made available for review.
 
-Orphan records are records whose foreign-key values do not match an existing parent record. Visitor reports and accommodation reports must reference a valid establishment. Room occupancy details must reference a valid accommodation report. The pipeline quarantines orphan records until the reference can be verified or corrected. It must not create missing parent records or silently delete orphan records.
+### 3.5 Cleaning Audit Trail and Logging
 
-## 3.5 Cleaning Audit Trail and Logging
+Every cleaning action must be traceable. Records that are corrected, deduplicated, rejected, or quarantined must be counted and logged so the project team can review the outcome of each rule.
 
-Every cleaning operation must be traceable. The pipeline records the rule ID, source dataset, affected record identifier when available, issue detected, action taken, processing timestamp, and processing outcome. Counts of records retained, corrected, quarantined, or removed must be maintained for reporting.
+The cleaning log should capture the rule ID, dataset name, affected record identifier, detected issue, action taken, processing timestamp, and outcome. Summary counts should distinguish records retained, corrected, quarantined, and removed as confirmed duplicates. These records support the logging and error-handling requirements described in Sections 7 and 8.
 
-Records rejected from the clean output must be retained in a quarantine location or an equivalent recoverable record store. Duplicate removals must also be counted and logged. No record may be silently dropped during cleaning. Detailed logging requirements and processing metrics are documented in Sections 7 and 8.
+The exact logging fields and quarantine mechanism must be confirmed against the actual pipeline implementation. If a feature has not yet been implemented, it should be identified as a planned requirement rather than reported as an existing capability.
 
-## 3.6 Relationship to Data Profiling
+### 3.6 Relationship to Data Profiling
 
-The cleaning rules in this section are intended to address the potential issues described in Section 2. Before finalizing the pipeline, the data profiling process must confirm which issues actually exist in the extracted datasets. Rules that are not triggered should be recorded as checks performed with zero affected records, where applicable. Actual counts and percentages must be calculated from profiling and cleaning logs rather than estimated.
+Section 2 identifies potential data quality issues through data profiling, while this section defines the cleaning response for each issue. The rule IDs provide a traceable link between identified problems and the actions intended to address them.
 
-
-# 4. Standardization and Data Type Rules
-
-Standardization ensures that the extracted VistaBalayan tourism datasets use consistent data types, formats, and reference values before being loaded into the processed database. This stage follows the cleaning rules defined in Section 3 and applies consistent representations to establishment information, visitor reports, accommodation reports, and room occupancy details.
-
-The transformation process uses Python to validate and convert extracted CSV values according to the expected PostgreSQL data types and the business requirements of the VistaBalayan Tourism Data Analytics and Decision Support Pipeline. Original source values are not silently overwritten when conversion fails. Invalid records are logged and sent to quarantine for review in accordance with the cleaning and logging procedures.
-
-## 4.1 Data Types
-
-The following table defines the target data types for the important columns in the VistaBalayan datasets. The types are based on the documented source schema. UUIDs are retained as identifiers, dates are converted to valid date values, and count fields are represented as integers.
-
-
-## 4.1 Data Types
-
-The following table defines the target data types for important columns in the VistaBalayan datasets and specifies how the pipeline handles values that cannot be converted or validated successfully.
-
+After cleaning, the pipeline should record the number of records processed, corrected, retained, quarantined, and removed as duplicates. These results can then be used in Section 4 for standardization and data type conversion, as well as in the validation and reconciliation process. Any estimated issue percentages from Section 2 must be distinguished from actual counts measured during execution.
 
 # 4. Standardization and Data Type Rules
 
@@ -269,8 +256,6 @@ Values that cannot be converted or validated are rejected from the clean output 
 Rejected records are not silently deleted. They must be recorded for review and may be corrected and processed again after verification. The pipeline maintains counts of successful conversions, failed conversions, and rejected records for reporting and auditing under Sections 7 and 8.
 
 
-
-
 ## 5. Business Transformation Rules
 
 This stage transforms cleaned VistaBalayan tourism data into business-ready data for visitor monitoring, accommodation analysis, and monthly tourism reporting. The rules include derived columns, joins, aggregations, and filtering. Each rule is applied after data cleaning, and records excluded by business rules are counted and logged with their corresponding reasons.
@@ -317,3 +302,88 @@ Surrogate keys may be generated for dimension records when required by the selec
 ### 5.5 Business Transformation Output
 
 The transformed datasets are intended to support daily monitoring, monthly tourism reports, visitor-origin analysis, and accommodation occupancy analysis. Each transformation must be traceable through its rule ID, input data, output columns, and logged exclusions or failures. The resulting datasets are passed to the next pipeline stage for loading or storage according to the project's configured target database.
+
+
+## 6. Transformed Data Contract and Naming Convention
+
+The transformation contract defines the structure and format of the data that will be received by the Load Stage. Unlike the extraction contract, which describes the data retrieved from the VistaBalayan source system, this contract identifies the target columns, data types, and transformations applied during processing. It may include standardized fields and derived columns needed for reporting and analysis.
+
+
+| Source Column | Target Column | Source Type | Target Type | Transformation Applied |
+|---|---|---|---|---|
+| `establishments.name` | `establishment_name` | TEXT | TEXT | Trim leading and trailing whitespace (C-01) |
+| `establishments.type` | `establishment_type` | TEXT | TEXT | Standardize establishment type values (S-03) |
+| `establishments.total_rooms` | `total_rooms` | INTEGER/TEXT | INTEGER | Convert to integer and validate nonnegative values (C-18, S-04) |
+| `visitor_reports.report_date` | `report_date` | DATE/TEXT | TEXT (YYYY-MM-DD) | Standardize date format (C-06, S-05) |
+| `visitor_reports.male_visitors` | `male_visitors` | INTEGER/TEXT | INTEGER | Validate and convert to a nonnegative integer (C-07, S-06) |
+| `visitor_reports.female_visitors` | `female_visitors` | INTEGER/TEXT | INTEGER | Validate and convert to a nonnegative integer (C-07, S-06) |
+| `visitor_reports.total_visitors` | `total_visitors` | INTEGER/TEXT | INTEGER | Validate against the sum of male and female visitors (C-08, S-07) |
+| `visitor_reports.male_visitors`, `visitor_reports.female_visitors` | `calculated_total_visitors` | INTEGER/TEXT | INTEGER | Derive the total by adding male and female visitors (B-01) |
+| `visitor_reports.report_date` | `report_year` | DATE/TEXT | INTEGER | Extract the year from the reporting date (B-02) |
+| `visitor_reports.report_date` | `report_month` | DATE/TEXT | INTEGER | Extract the month from the reporting date (B-02) |
+| `visitor_reports.report_date` | `report_day` | DATE/TEXT | INTEGER | Extract the day from the reporting date (B-03) |
+| `visitor_reports.origin_municipality` | `origin_municipality` | TEXT | TEXT | Trim whitespace and standardize municipality names (S-09) |
+| `visitor_reports.origin_province` | `origin_province` | TEXT | TEXT | Trim whitespace and standardize province names (S-10) |
+| `visitor_reports.origin_country` | `origin_country` | TEXT | TEXT | Trim whitespace and standardize country names (S-11) |
+| `accommodation_reports.report_date` | `report_date` | DATE/TEXT | TEXT (YYYY-MM-DD) | Standardize date format (C-10, S-05) |
+| `accommodation_reports.total_rooms` | `total_rooms` | INTEGER/TEXT | INTEGER | Validate and convert room counts to nonnegative integers (C-11, S-12) |
+| `accommodation_reports.occupied_rooms` | `occupied_rooms` | INTEGER/TEXT | INTEGER | Validate occupied-room counts against total rooms (C-12, S-13) |
+| `accommodation_reports.check_ins` | `check_ins` | INTEGER/TEXT | INTEGER | Validate and convert check-in counts (C-11, S-12) |
+| `accommodation_reports.guest_nights` | `guest_nights` | INTEGER/TEXT | INTEGER | Validate and convert guest-night counts (C-11, S-12) |
+| `accommodation_reports.total_rooms`, `accommodation_reports.occupied_rooms` | `occupancy_rate` | INTEGER/TEXT | DECIMAL | Calculate the percentage of occupied rooms from total rooms (B-06) |
+| `room_occupancy_details.room_type` | `room_type` | TEXT | TEXT | Trim whitespace and standardize room-type labels |
+| `room_occupancy_details.number_of_rooms` | `number_of_rooms` | INTEGER/TEXT | INTEGER | Validate and convert to a nonnegative integer (C-15, S-14) |
+| `room_occupancy_details.occupied_rooms` | `occupied_rooms` | INTEGER/TEXT | INTEGER | Validate occupied rooms against the number of rooms (C-16, S-15) |
+| `room_occupancy_details.check_ins` | `check_ins` | INTEGER/TEXT | INTEGER | Validate and convert check-in counts (S-14) |
+| `room_occupancy_details.guest_nights` | `guest_nights` | INTEGER/TEXT | INTEGER | Validate and convert guest-night counts (S-14) |
+| `room_occupancy_details.number_of_rooms`, `room_occupancy_details.occupied_rooms` | `room_type_occupancy_rate` | INTEGER/TEXT | DECIMAL | Calculate the occupancy percentage for each room type (B-07) |
+| `establishments.id` | `establishment_id` | UUID/TEXT | TEXT | Preserve the source identifier for traceability and joins |
+| `visitor_reports.establishment_id` | `establishment_id` | UUID/TEXT | TEXT | Preserve the foreign key linking visitor reports to establishments |
+| `accommodation_reports.establishment_id` | `establishment_id` | UUID/TEXT | TEXT | Preserve the foreign key linking accommodation reports to establishments |
+| `room_occupancy_details.accommodation_report_id` | `accommodation_report_id` | UUID/TEXT | TEXT | Preserve the foreign key linking room occupancy details to accommodation reports |
+
+**Note:** Target column names and data types describe the proposed transformation contract. Derived columns such as `calculated_total_visitors`, `report_year`, `report_month`, `report_day`, `occupancy_rate`, and `room_type_occupancy_rate` should be included in the final contract only if they are actually generated by the transformation code. In the SQLite output, dates and UUID identifiers may be stored as `TEXT`, depending on the implemented schema.
+
+## 7. Transformation Validation and Data Quality Checks
+
+Transformation validation verifies that the processed VistaBalayan tourism data is correct, complete, consistent, and suitable for the succeeding Load Stage. These checks focus on the transformed output, including record reconciliation, required fields, key uniqueness, referential integrity, data type conformity, business rules, joins, and aggregated results. Extraction-stage checks that only verify source connectivity or extraction execution are excluded from this section.
+
+| Check Name | Target | Purpose | Validation Criteria | Severity |
+|---|---|---|---|---|
+| Record Reconciliation | All transformed output tables | Identify records that may have been lost or incorrectly excluded during transformation. | For row-level cleaning, `input_count = retained_count + rejected_count`. Modified and retained records remain part of `retained_count`. Any documented duplicate handling, splits, or other record changes must be accounted for separately. | Critical |
+| Rejected Record Tracking | Records rejected during transformation | Ensure invalid records are documented instead of silently removed. | Every rejected record must have a recorded rejection reason, and the rejected count must agree with the transformation logs or rejection records. | Critical |
+| Required Column Null Check | Required columns in `establishments`, `visitor_reports`, `accommodation_reports`, and `room_occupancy_details` | Ensure required fields contain usable values after transformation. | Required identifiers, reporting dates, and essential relationship keys must not be null or blank. Optional fields may remain null when permitted by the target schema. | Critical |
+| Primary Key Uniqueness | Primary keys in all transformed output tables | Prevent duplicate records from being treated as separate entities. | Duplicate count for each defined primary key must equal zero. | Critical |
+| Referential Integrity | `establishment_id` in visitor and accommodation reports; `accommodation_report_id` in room occupancy details | Ensure related records reference existing parent records. | Every non-null foreign key must match an existing parent identifier in the corresponding transformed table. Unmatched records must be rejected, corrected, or explicitly reported. | Critical |
+| Data Type Conformance | Dates, visitor counts, room counts, check-ins, and guest nights | Ensure transformed values follow the expected target data types. | Dates must follow the agreed `YYYY-MM-DD` format. Count fields must contain valid, nonnegative integers. Values that cannot be converted must be rejected or reported according to the transformation rules. | Critical |
+| Date Format Validation | `report_date` in visitor and accommodation reports | Ensure dates can be used consistently for grouping and analysis. | Every non-null reporting date must be a valid calendar date in the agreed `YYYY-MM-DD` format. | Critical |
+| Visitor Count Validation | `male_visitors`, `female_visitors`, and `total_visitors` in `visitor_reports` | Prevent invalid visitor counts and inconsistent totals. | Visitor counts must be nonnegative integers. Where the total is defined as the sum of male and female visitors, `total_visitors = male_visitors + female_visitors`. Any mismatch must be corrected or flagged. | Critical |
+| Room Count Validation | `total_rooms` and `occupied_rooms` in `accommodation_reports` | Prevent impossible room occupancy values. | Room counts must be nonnegative integers, and `occupied_rooms` must not exceed `total_rooms`. Records with inconsistent values must be corrected or flagged. | Critical |
+| Room Occupancy Detail Validation | `number_of_rooms` and `occupied_rooms` in `room_occupancy_details` | Ensure room-level occupancy data is logically valid. | Room counts must be nonnegative integers, and occupied rooms must not exceed the number of rooms for the corresponding room type. | Critical |
+| Establishment Join Validation | Joins between `establishments` and visitor or accommodation reports | Detect missing establishment matches and incorrect join results. | Each report must match the intended establishment when an establishment reference is required. Unmatched records must be counted and investigated. | Critical |
+| Join Cardinality Validation | Joined visitor, accommodation, and room occupancy datasets | Prevent unexpected row multiplication or loss during joins. | The number of joined rows must match the expected result based on the documented join relationship. One-to-many relationships must be accounted for, and unexpected duplicate multiplication must equal zero. | Critical |
+| Filtering Audit | Records excluded by transformation filters | Ensure excluded records are accounted for and have documented reasons. | Every excluded record must be counted and associated with a defined filtering condition or exclusion reason. No record may be silently dropped. | Critical |
+| Aggregation Reconciliation | Visitor totals and other derived summary measures | Verify that aggregation preserves the measures contributed by valid input records. | For each defined aggregation, the output measure must equal the sum of its eligible contributing input measures, subject to documented exclusions and grouping rules. | Critical |
+| Monthly Visitor Summary Check | Monthly visitor totals, if generated | Ensure monthly summaries accurately represent the underlying visitor reports. | Each monthly total must equal the sum of eligible visitor totals assigned to that month and year. The sum across monthly groups must reconcile with the eligible input total. | Critical |
+| Occupancy Rate Validation | `occupancy_rate` and `room_type_occupancy_rate`, if generated | Ensure calculated occupancy percentages are mathematically valid. | When the denominator is greater than zero, occupancy rate must equal `(occupied_rooms / total_rooms) × 100`. A zero denominator must be handled explicitly to prevent division errors. | Critical |
+| Business Rule Validation | All transformed tourism datasets | Ensure transformed values comply with documented tourism data rules. | Visitor counts, room counts, check-ins, and guest nights must not be negative. Derived values must follow their documented formulas, and invalid records must be corrected, rejected, or flagged. | Critical |
+| Transformation Output Verification | All transformed output tables | Confirm that expected output datasets and required columns are produced. | Each expected output table must exist, and its required columns must match the transformation contract. Missing tables or required columns must stop the pipeline. | Critical |
+| Non-Critical Standardization Warning | Establishment types, room types, and visitor-origin fields | Identify values that remain inconsistent or cannot be matched to standard labels. | Unrecognized values must be logged or flagged for review. They may remain in the output only when the documented transformation rules permit it. | Non-critical |
+
+### 7.1 Record Reconciliation Rules
+
+Record reconciliation will be used to account for changes made during transformation. For row-level cleaning, the required relationship is:
+
+`Input Records = Retained Records + Rejected Records`
+
+Records that are cleaned or standardized and then retained are counted as retained, not rejected. The number of modified records may be recorded separately for monitoring purposes.
+
+For aggregation, validation will compare the measures contributed by eligible input records with the resulting aggregated measures. For joins, validation will examine expected join relationships, unmatched records, and unexpected row multiplication. For filtering, excluded records and their reasons will be documented.
+
+### 7.2 Validation Severity
+
+**Critical** checks must pass before the transformed dataset is accepted for loading. A critical failure must stop the pipeline or prevent the affected output from being approved until the issue is resolved.
+
+**Non-critical** checks produce warnings for review. They may allow processing to continue when the documented transformation rules permit it and the issue does not compromise the reliability of the output.
+
+**Implementation note:** These checks define the required validation criteria. The final documentation should identify which checks are actually implemented in `pipeline/transform.py` and which remain planned. Derived fields and aggregated outputs should only be validated if the transformation code generates them.
