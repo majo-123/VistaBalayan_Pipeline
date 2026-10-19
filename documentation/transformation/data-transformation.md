@@ -308,7 +308,6 @@ The transformed datasets are intended to support daily monitoring, monthly touri
 
 The transformation contract defines the structure and format of the data that will be received by the Load Stage. Unlike the extraction contract, which describes the data retrieved from the VistaBalayan source system, this contract identifies the target columns, data types, and transformations applied during processing. It may include standardized fields and derived columns needed for reporting and analysis.
 
-
 | Source Column | Target Column | Source Type | Target Type | Transformation Applied |
 |---|---|---|---|---|
 | `establishments.name` | `establishment_name` | TEXT | TEXT | Trim leading and trailing whitespace (C-01) |
@@ -387,3 +386,118 @@ For aggregation, validation will compare the measures contributed by eligible in
 **Non-critical** checks produce warnings for review. They may allow processing to continue when the documented transformation rules permit it and the issue does not compromise the reliability of the output.
 
 **Implementation note:** These checks define the required validation criteria. The final documentation should identify which checks are actually implemented in `pipeline/transform.py` and which remain planned. Derived fields and aggregated outputs should only be validated if the transformation code generates them.
+
+
+## 8. Transformation Metadata and Log Specification
+
+Transformation metadata and logs will be used to monitor each VistaBalayan transformation batch, track processing results, identify errors, and maintain traceability between extracted source data and transformed output. Each run should have a unique `run_id` linked to the corresponding extraction run through `parent_run_id`. This reference allows the transformation stage to trace its input without duplicating the extraction-stage metadata.
+
+The following table specifies the metadata and log fields required for each transformation run.
+
+| Field | Purpose | Example |
+|---|---|---|
+| `run_id` | Unique identifier assigned to each transformation pipeline run. | `TRF_20261019_2000` |
+| `parent_run_id` | References the extraction run that supplied the input data. | `EXT_20261019_1930` |
+| `batch_id` | Identifies a specific transformation batch within a pipeline run. | `BATCH_001` |
+| `batch_window` | Records the reporting date range or processing window covered by the batch. | `2026-10-01 to 2026-10-18` |
+| `table_name` | Identifies the source dataset or table being transformed. | `visitor_reports` |
+| `transformation_start_time` | Records when transformation processing begins. | `2026-10-19 20:00:00` |
+| `transformation_end_time` | Records when transformation processing finishes. | `2026-10-19 20:00:08` |
+| `status` | Indicates the final result of the transformation run or batch. | `SUCCESS`, `FAILED`, or `PARTIAL_SUCCESS` |
+| `records_read` | Number of input records received for transformation. | `2,400` |
+| `records_output` | Number of records retained and produced in the transformed output. | `2,350` |
+| `records_rejected` | Number of input records rejected or quarantined because they failed applicable transformation rules. | `50` |
+| `records_modified` | Total number of retained records modified by cleaning or transformation rules. This metric is recorded separately and is not included in the reconciliation equation. | `C-01: 120; S-03: 35` |
+| `rules_applied` | Records the rule identifiers and the number of records affected by each cleaning or transformation rule. | `C-01: 120; S-03: 35; B-01: 2,350` |
+| `validation_results` | Stores the outcome of validation checks performed on the transformed output. | `PASS: 15; FAIL: 0; WARNING: 2` |
+| `error_code` | Identifies the category of an error when a transformation operation fails. | `TRANSFORM_TYPE_ERROR` |
+| `error_message` | Describes the error encountered and provides information for troubleshooting. | `Invalid date format in visitor_reports.report_date` |
+| `transformation_duration_seconds` | Records the total elapsed time between transformation start and end. | `8.25` |
+| `transformation_code_version` | Identifies the version or Git commit of the transformation code used for the run. | `v1.0.0` or `git: a1b2c3d` |
+| `rules_version` | Identifies the version of the documented cleaning and transformation rules applied. | `rules-v1.0` |
+
+**Note:** The example values are illustrative and do not represent confirmed execution logs. The `parent_run_id` should reference an actual extraction run identifier when extraction metadata is available. If the current extraction process does not generate run IDs, this field must be added to the pipeline metadata design.
+
+### 8.1 Record Reconciliation in Transformation Logs
+
+The transformation logs will record input, output, and rejected record counts so that each batch can be reconciled using the following equation:
+
+`records_read = records_output + records_rejected`
+
+This equation applies to row-level transformation when each input record is either retained as one output record or rejected. Records that are cleaned and retained are included in `records_output`, even when their values change. Therefore, `records_modified` is monitored separately and must not be added to `records_rejected`.
+
+For aggregation, joins, filtering, or transformations that split or combine records, additional reconciliation details must be recorded. These may include contributing input counts, output counts, excluded records, unmatched join records, and input-versus-output measures. This ensures that changes in record counts are explainable rather than automatically treated as data loss.
+
+### 8.2 Use of Transformation Metadata and Logs
+
+The metadata and logs support the following activities:
+
+- **Monitoring:** Track the status, processing duration, record counts, and validation outcomes of each transformation run.
+- **Troubleshooting:** Use error codes, error messages, rejected-record counts, and rule-level statistics to identify the cause of processing failures or inconsistent results.
+- **Auditing:** Maintain a traceable record of when transformation occurred, which datasets were processed, which rules were applied, and which code version was used.
+- **Data lineage:** Connect the transformation run to its parent extraction run through `parent_run_id`, while using `run_id`, `batch_id`, and `table_name` to identify the specific processing activity and output.
+- **Recovery:** Identify failed or incomplete batches, review their last recorded status, and determine which inputs and transformations need to be rerun. Recovery procedures should avoid unintentionally duplicating previously produced output.
+
+### 8.3 Log Retention and Access
+
+Transformation logs should be retained for at least 30 days after each transformation run to support troubleshooting, auditing, and recovery of failed batches. Access should be restricted to authorized project team members. Logs may be retained longer when required for an ongoing investigation, audit, or recovery activity.
+
+### 8.4 Implementation Considerations
+
+The fields in this section define the required transformation logging specification. Before describing them as implemented, the team should verify whether the current transformation code actually records each field. Metadata that is not yet generated, including extraction linkage, rule-level modification counts, validation summaries, code versions, and batch recovery information, should be identified as planned until implemented.
+
+
+## 9. Log Retention, Rejected Data, and Access
+
+The VistaBalayan transformation stage will maintain transformation logs and rejected records to support troubleshooting, auditing, data quality monitoring, and recovery of failed batches. Transformation logs will document cleaning actions, conversion errors, validation failures, processing results, and record counts. Rejected records will be stored separately from successfully transformed data so that invalid records can be reviewed without compromising the quality of the output.
+
+### 9.1 Log and Rejected Data Retention
+
+| Requirement | Specification |
+|---|---|
+| Transformation Log Retention Period | Transformation logs are proposed to be retained for at least 30 days after each transformation run. This period allows the project team to review recent processing activities, investigate errors, and recover failed or incomplete batches. |
+| Transformation Log Storage Location | Transformation logs should be stored in a designated project-controlled logging directory, such as `pipeline/logs/`, or in a centralized logging system if implemented. |
+| Quarantine Storage Location | Rejected records should be stored separately from valid transformed output in a designated quarantine directory, such as `pipeline/quarantine/`, or in a dedicated quarantine table if database-based storage is implemented. |
+| Quarantine Retention Period | Rejected records should be retained for at least 30 days after the related transformation run to allow investigation, correction, and possible reprocessing. |
+| Access Permissions | Authorized project team members may read logs and quarantine records for monitoring and troubleshooting. Only designated personnel should be permitted to create, update, or delete these records according to their assigned responsibilities. |
+| Archiving Requirements | Logs and rejected records that must be retained beyond the operational retention period should be archived in approved project-controlled storage, where applicable. Archived records should remain traceable to their original run and batch. |
+| Deletion Rules | Logs and rejected records must not be deleted before the defined retention period or while they are needed for troubleshooting, auditing, or recovery. Deletion should occur only after the retention requirements have been met and the records are no longer required. |
+| Responsible Process | The designated project team member responsible for pipeline maintenance should review retention requirements and authorize or perform deletion according to the documented procedure. |
+| Sensitive Data Handling | Logs and quarantine records should contain only the information necessary for monitoring and investigation. Unnecessary personal, confidential, or sensitive source data should not be copied into log messages. |
+
+### 9.2 Separation of Extraction and Transformation Records
+
+Although the extraction and transformation stages may use a shared logging system, their records must remain distinguishable because they document different activities.
+
+| Record Type | Information Recorded | Ownership and Retention |
+|---|---|---|
+| Extraction Logs | Source retrieval errors, extraction start and end times, extracted record counts, and source-to-staging reconciliation results. | Managed by the extraction stage. Retained according to the extraction-stage retention policy. |
+| Transformation Logs | Cleaning actions, conversion errors, validation results, transformation status, record counts, rule-level statistics, and processing failures. | Managed by the transformation stage. Retained for at least 30 days after each transformation run. |
+| Transformation Quarantine | Records that could not be safely transformed, including the rejection reason, associated `batch_id`, and applicable `rule_id`. | Managed by the transformation stage. Retained for at least 30 days after the related transformation run, subject to investigation, audit, and recovery requirements. |
+| Audit Records | Records of significant processing events, access, administrative actions, or changes that require longer-term traceability. | Managed by the designated project owner. Retention should follow the applicable project or institutional requirements and may exceed the operational log retention period. |
+
+### 9.3 Quarantine Record Requirements
+
+Each quarantined record should contain enough information to identify and investigate the transformation failure. The quarantine structure should include the following fields where applicable:
+
+| Field | Purpose | Example |
+|---|---|---|
+| `quarantine_id` | Uniquely identifies the quarantined record. | `QTN_0001` |
+| `run_id` | Identifies the transformation run in which the failure occurred. | `TRF_20261019_2000` |
+| `batch_id` | Identifies the batch associated with the rejected record. | `BATCH_001` |
+| `source_table` | Identifies the original dataset or table. | `visitor_reports` |
+| `source_record_id` | References the source record for traceability, when available. | `VR_1025` |
+| `rule_id` | Identifies the cleaning or transformation rule that failed. | `C-06` |
+| `rejection_reason` | Explains why the record could not be safely transformed. | `Invalid reporting date` |
+| `rejected_at` | Records the date and time when the record was rejected. | `2026-10-19 20:00:05` |
+| `reprocessing_status` | Tracks whether the record is awaiting review, corrected, or reprocessed. | `PENDING_REVIEW` |
+
+The examples above are illustrative. The quarantine fields should be implemented according to the actual transformation code and storage design. If the pipeline does not currently generate a quarantine table or file, this specification represents the proposed design rather than an existing feature.
+
+### 9.4 Archiving and Deletion Procedure
+
+Before deleting operational logs or quarantined records, the responsible project team member should verify that the minimum retention period has elapsed and that no active troubleshooting, audit, or recovery activity requires the records. Records that must be retained longer should be archived in approved storage, with their run identifiers, batch identifiers, and related metadata preserved.
+
+Deletion should follow an authorized and documented process. Records must not be removed merely because a transformation run has completed or because a newer batch has been processed. Any applicable audit records should follow their separate retention requirements.
+
+**Implementation note:** The 30-day retention period is a proposed project policy. The actual storage paths, access controls, automated deletion procedures, and quarantine mechanisms must be verified against the current repository before they are documented as implemented.
