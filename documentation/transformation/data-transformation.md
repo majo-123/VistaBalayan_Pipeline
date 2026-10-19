@@ -446,7 +446,6 @@ Transformation logs should be retained for at least 30 days after each transform
 
 The fields in this section define the required transformation logging specification. Before describing them as implemented, the team should verify whether the current transformation code actually records each field. Metadata that is not yet generated, including extraction linkage, rule-level modification counts, validation summaries, code versions, and batch recovery information, should be identified as planned until implemented.
 
-
 ## 9. Log Retention, Rejected Data, and Access
 
 The VistaBalayan transformation stage will maintain transformation logs and rejected records to support troubleshooting, auditing, data quality monitoring, and recovery of failed batches. Transformation logs will document cleaning actions, conversion errors, validation failures, processing results, and record counts. Rejected records will be stored separately from successfully transformed data so that invalid records can be reviewed without compromising the quality of the output.
@@ -501,3 +500,124 @@ Before deleting operational logs or quarantined records, the responsible project
 Deletion should follow an authorized and documented process. Records must not be removed merely because a transformation run has completed or because a newer batch has been processed. Any applicable audit records should follow their separate retention requirements.
 
 **Implementation note:** The 30-day retention period is a proposed project policy. The actual storage paths, access controls, automated deletion procedures, and quarantine mechanisms must be verified against the current repository before they are documented as implemented.
+
+
+## 10. Transformation Acceptance and Handover Rules
+
+The Transformation Acceptance and Handover Rules define the conditions that determine whether transformed VistaBalayan tourism data is ready to proceed to the Load Stage. Unlike the Extraction Stage, which determines whether extracted data can proceed to transformation, this stage evaluates the correctness, completeness, consistency, and validation results of the transformed output.
+
+A batch may proceed automatically only when all critical validation checks pass and the rejection rate remains within the predefined project threshold. Batches with non-critical warnings or rejection rates above the threshold require manual review. Batches with unresolved critical failures must not proceed to loading.
+
+### 10.1 Predefined Rejection-Rate Threshold
+
+The project sets a maximum rejection rate of **1% per transformation batch** as the proposed acceptance threshold. This limit is intended to keep data loss caused by invalid or untransformable records low while allowing a small number of records to be rejected for legitimate data quality reasons.
+
+The rejection rate is calculated as follows:
+
+`Rejection Rate (%) = (records_rejected / records_read) × 100`
+
+The rejection rate must be calculated using the input records processed by the transformation batch. Records that are cleaned or modified and retained in the output are not considered rejected records.
+
+If `records_read` equals zero, the rejection rate must be reported as not applicable, and the batch must be reviewed to determine whether an empty input is expected. The 1% threshold is a proposed project policy and should be approved before operational use.
+
+### 10.2 Transformation Acceptance Decision Rules
+
+| Validation Condition | Acceptance Criteria | Pipeline Action | Decision Type | Responsible Person or Role |
+|---|---|---|---|---|
+| All critical validation checks pass, no unresolved validation failures exist, and the rejection rate is at or below 1%. | All required output tables and columns are present, required fields are valid, key constraints are satisfied, and the output meets the transformation contract. | Mark the batch as `APPROVED` and allow the transformed output and its metadata to proceed to the Load Stage. | Automatic | Transformation pipeline |
+| All critical checks pass, but one or more non-critical warnings exist. | Warnings are documented, their impact is assessed, and the output is considered usable only after review. | Mark the batch as `MANUAL_REVIEW` and hold it until an authorized reviewer records a decision. | Manual | Designated Data Quality Reviewer or Municipal Tourism Office Personnel |
+| All critical checks pass, but the rejection rate exceeds 1%. | The rejection rate exceeds the predefined threshold, requiring investigation into the rejected records and their causes. | Mark the batch as `MANUAL_REVIEW`; inspect rejection reasons and determine whether correction or reprocessing is necessary. | Manual | Designated Data Quality Reviewer or Pipeline Maintainer |
+| One or more critical validation checks fail. | Any critical failure remains unresolved, including invalid required fields, duplicate primary keys, broken referential integrity, or invalid business-rule results. | Mark the batch as `REJECTED` or `FAILED`; prevent handover to the Load Stage and correct or reprocess the affected data. | Automatic failure detection; manual resolution | Pipeline Maintainer |
+| Transformation execution fails or produces incomplete output. | Required transformation processing does not finish successfully, or required output tables or columns are missing. | Mark the batch as `FAILED`; preserve logs and rejected records, investigate the cause, and retry after correction when appropriate. | Automatic failure detection; manual recovery | Pipeline Maintainer |
+| Input data is empty or the batch contains no eligible records. | Empty input is not automatically accepted unless it is an expected and documented condition. | Hold the batch for review; confirm whether the source data is legitimately empty or whether the extraction or transformation process failed. | Manual | Designated Data Quality Reviewer or Pipeline Maintainer |
+| A reviewed batch has documented warnings or a rejection rate above 1%, but the reviewer determines that the remaining output is suitable for loading. | The reviewer documents the investigation, justification, and approval, and confirms that no critical failures remain. | Record the decision and approve the batch for handover. | Manual | Authorized Data Quality Reviewer or Project Supervisor |
+| A reviewed batch remains unsuitable after investigation. | Critical issues remain unresolved, rejected records cannot be adequately explained, or output reliability cannot be established. | Mark the batch as `REJECTED`; retain the relevant logs and quarantine records, and require correction or a new transformation run. | Manual | Authorized Data Quality Reviewer or Project Supervisor |
+
+### 10.3 Overall Transformation Decision
+
+The overall batch decision is determined by the validation results of all required transformed datasets. The following table illustrates the expected decision process.
+
+| Decision Rules | Overall Condition | Acceptance Decision | Pipeline Action |
+|---|---|---|---|
+| All required tables pass critical checks, have no unresolved warnings, and remain within the rejection threshold. | All tables `PASS` | `APPROVED` | Proceed to Load |
+| One or more tables contain non-critical warnings, or the rejection rate exceeds 1% without critical failures. | One or more tables `WARNING` | `MANUAL_REVIEW` | Hold batch pending review |
+| One or more tables fail a critical validation check. | One or more tables `FAIL` | `REJECTED` | Stop handover; correct or reprocess |
+| Transformation execution fails or required outputs are incomplete. | Transformation `FAILED` | `REJECTED` | Stop, preserve logs, and retry after correction |
+| The batch is reviewed and approved with documented justification. | Review completed; no unresolved critical failures | `APPROVED` | Record approval and proceed to Load |
+| The batch is reviewed and determined unsuitable. | Review unsuccessful | `REJECTED` | Keep the batch on hold and require correction or reprocessing |
+
+### 10.4 Example Validation Summary
+
+The following example illustrates how the transformation results can be summarized before the handover decision. The results are illustrative and are not actual execution results.
+
+| Transformed Dataset | Validation Result | Notes |
+|---|---|---|
+| `establishments` | `PASS` | Required fields and identifier checks passed. |
+| `visitor_reports` | `PASS` | Visitor counts, dates, and relationship checks passed. |
+| `accommodation_reports` | `WARNING` | A non-critical standardization issue requires review. |
+| `room_occupancy_details` | `PASS` | Room count and relationship checks passed. |
+| Overall Transformation | `MANUAL_REVIEW` | The batch is held until the warning is reviewed and an authorized decision is recorded. |
+
+### 10.5 Handover Requirements to the Load Stage
+
+Only batches with an overall status of `APPROVED` may proceed to the Load Stage. The following information should accompany each approved transformation batch:
+
+| Handover Item | Description |
+|---|---|
+| Transformed Output | The validated transformed datasets, including their final table names, column names, and data types as defined by the transformation contract. |
+| Run Identification | The transformation `run_id`, related `batch_id`, and `parent_run_id` linking the batch to its extraction run. |
+| Batch Information | The applicable reporting date range or batch window and the names of the transformed datasets. |
+| Record Counts | The number of records read, retained as output, rejected, and modified during transformation. |
+| Validation Summary | The results of required critical and non-critical validation checks, including reconciliation, key uniqueness, referential integrity, data type conformity, and business-rule validation. |
+| Rejection Information | Rejection counts, reasons, and quarantine references needed for traceability and audit purposes. |
+| Transformation Version | The code version and rules version used to produce the transformed output. |
+| Acceptance Decision | The overall decision (`APPROVED`), approval timestamp, and reviewer details when manual approval was required. |
+| Error and Warning Summary | Relevant warnings or resolved issues that the Load Stage may need to know before processing the approved batch. |
+
+### 10.6 Handover and Recovery Procedure
+
+Before handover, the transformation pipeline should confirm that all required outputs exist and that the acceptance criteria have been met. The batch status, validation summary, record counts, and run identifiers should be recorded so that the Load Stage can identify the exact transformed output and trace it to the corresponding extraction run.
+
+If a batch is rejected or fails, it must not be handed over. The Pipeline Maintainer should review the transformation logs and quarantine records, correct the identified problem, and rerun the affected transformation when appropriate. The failed batch's original logs and metadata should be preserved for auditing and troubleshooting.
+
+Manual approvals must include the reviewer's identity, decision, date and time, and justification. A batch with unresolved critical failures cannot be approved through manual review.
+
+
+## 11. Common Transformation Problems and Mitigation
+
+The VistaBalayan transformation stage processes tourism data from `establishments`, `visitor_reports`, `accommodation_reports`, and `room_occupancy_details`. During batch processing, problems may arise from inconsistent source values, invalid records, duplicate identifiers, missing relationships, or incorrect aggregation. These problems can affect the accuracy and completeness of the transformed datasets and must be handled before the data is handed over to the Load Stage.
+
+The following table identifies potential transformation problems, their causes and impacts, and the mitigation measures that should be applied.
+
+| Problem | Possible Cause | Impact | Mitigation |
+|---|---|---|---|
+| Duplicate records after a batch rerun | A transformation batch is executed again without checking whether its output has already been generated. | Duplicate visitor or accommodation records may inflate tourism totals and affect subsequent analysis. | Use a unique run or batch identifier to track processing. Before rerunning, identify and remove or replace only the affected batch output, or use an idempotent processing method. Validate primary key uniqueness after transformation. |
+| Invalid or inconsistent reporting dates | Source dates are missing, malformed, or stored in inconsistent formats. | Records may fail date conversion, be assigned to incorrect reporting periods, or be excluded from monthly and yearly summaries. | Standardize valid dates to `YYYY-MM-DD`, validate calendar dates, and quarantine records that cannot be converted safely. Record the applicable rule ID and rejection reason. |
+| Negative or nonnumeric visitor counts | Visitor count fields contain invalid text, negative values, or values that cannot be converted to integers. | Visitor totals may become inaccurate, or calculations and aggregations may fail. | Convert count fields to valid nonnegative integers. Reject or quarantine invalid values and validate that the total visitor count agrees with the sum of male and female visitors when applicable. |
+| Inconsistent establishment identifiers | A report contains an `establishment_id` that does not match an existing establishment record. | Reports may become orphaned, be excluded from establishment-level analysis, or be associated with the wrong establishment. | Validate foreign key relationships before producing the final transformed output. Investigate unmatched identifiers and correct them only when the proper relationship can be verified. |
+| Unexpected row multiplication after a join | A join uses a non-unique key or an incorrect relationship between establishments, visitor reports, accommodation reports, and room occupancy details. | Output row counts and aggregated visitor or accommodation measures may be inflated. | Check join cardinality, validate key uniqueness where required, and compare joined counts with expected relationships. Add a critical validation check for unexpected row multiplication before accepting the batch. |
+| Missing records after filtering | A filter excludes records because of an incorrect condition, unexpected null values, or an overly restrictive rule. | Valid tourism records may be omitted from transformed outputs, resulting in incomplete reports. | Review filter conditions, count excluded records, and record the exclusion reason. Reconcile input, retained, and rejected records for row-level processing; investigate exclusions that are not explained by the rules. |
+| Incorrect aggregated visitor totals | Aggregation uses the wrong grouping columns, includes duplicate records, or sums an incorrect field. | Monthly, yearly, or origin-based tourism summaries may not represent the underlying visitor reports. | Define grouping rules explicitly, verify the measure being aggregated, and reconcile aggregate totals against eligible contributing input records. Correct the transformation logic and rerun affected batches when discrepancies occur. |
+| Invalid room occupancy values | `occupied_rooms` exceeds `total_rooms`, room counts are negative, or room-level counts are inconsistent. | Occupancy calculations may exceed valid limits or produce misleading accommodation performance indicators. | Validate room counts before calculating occupancy. Flag or quarantine invalid records and calculate occupancy only when the denominator is valid and greater than zero. |
+| Division by zero in occupancy calculations | `total_rooms` or `number_of_rooms` equals zero when calculating occupancy percentages. | Calculations may raise errors or produce undefined occupancy rates. | Check the denominator before calculation. Store a documented null or other approved representation when a rate cannot be calculated, and ensure the handling rule is consistent across the output. |
+| Unrecognized establishment or room types | Source values contain spelling variations, inconsistent capitalization, abbreviations, or new categories. | Category-based summaries may split equivalent values into separate groups or omit records from expected categories. | Trim whitespace and standardize values using an approved mapping. Flag unrecognized categories for review rather than automatically assigning an unsupported category. |
+| Source schema changes | A source column is renamed, removed, or changes its data type. | The transformation process may fail or produce incomplete or incorrectly typed output. | Validate required source columns and expected types before transformation. Stop the affected batch if a critical field is missing or incompatible, record the error, and update the transformation rules only after reviewing the schema change. |
+| Late-arriving or updated tourism records | Establishments submit reports after the reporting period or correct previously submitted records. | A completed batch may omit late reports or retain outdated values, affecting historical summaries. | Compare the new input with the previously processed reporting period. Where the extraction process supports it, reprocess an approved lookback window or affected reporting dates and reconcile the updated output. |
+| Transformation output does not match the data contract | A code change introduces missing columns, unexpected data types, or inconsistent column names. | The Load Stage may be unable to interpret or process the transformed datasets correctly. | Validate the transformed output against the documented data contract, including required tables, column names, data types, and key constraints. Prevent handover until critical contract violations are corrected. |
+| Excessive rejected-record rate | A source dataset contains many invalid values, or a transformation rule is incorrectly configured. | Too few records may remain for reliable tourism analysis, and the batch may exceed the permitted rejection threshold. | Calculate the rejection rate for each batch and compare it with the predefined 1% project threshold. Hold batches that exceed the threshold for review, inspect rejection reasons, and correct the underlying issue before approval. |
+| Transformation batch fails partway through processing | An unexpected data conversion error, code exception, or unavailable input file interrupts execution. | The output may be incomplete, and downstream processing could receive inconsistent datasets if the failed batch is mistakenly accepted. | Record the failure and relevant error details, preserve the available logs, and mark the batch as `FAILED`. Do not hand over incomplete output. Correct the cause and rerun the affected batch after checking for duplicate or partial output. |
+| Reprocessing produces inconsistent results | Transformation rules change between runs, or a batch is rerun using a different code version without being documented. | Identical source data may produce different results, making auditing and comparison difficult. | Record the transformation code version and rules version for each run. Use version-controlled changes, retain the original run metadata, and document the reason for any changed results. |
+| Batch processing takes longer than expected | Data volume increases, inefficient joins or transformations are used, or repeated operations perform unnecessary work. | Transformation completion may be delayed, postponing validation and handover to the Load Stage. | Monitor batch duration and record counts. Profile the slowest operations, reduce unnecessary repeated processing, and optimize joins or process data in manageable batches when necessary. |
+
+### 11.1 Problem Handling and Recovery
+
+When a transformation problem occurs, the pipeline should record the affected dataset, batch identifier, applicable rule ID, error details, and the action taken. Invalid records that cannot be safely transformed should be quarantined with a documented rejection reason, while unexpected processing failures should be logged for investigation.
+
+Critical data quality failures must prevent the affected batch from being handed over to the Load Stage. After the underlying issue is corrected, the responsible team member should rerun the affected transformation and repeat the required validation checks. The new results must satisfy the acceptance criteria defined in Section 10 before the batch is approved.
+
+### 11.2 Maintenance and Handover Considerations
+
+The mitigation measures in this section provide guidance for maintaining reliable transformation processing. The team should verify which safeguards are already implemented in `pipeline/transform.py` and distinguish them from proposed improvements. Features such as automatic retries, lookback-window reprocessing, batch-level replacement, schema-change alerts, and a persistent quarantine table must not be described as implemented unless the code supports them.
+
+The Transformation Stage ends after the transformed datasets have passed the required validation checks, their metadata and acceptance results have been recorded, and the approved output has been packaged for handover. Loading the transformed data into a target database or data warehouse belongs to the Load Stage and is not performed here unless explicitly required by the project.
+
