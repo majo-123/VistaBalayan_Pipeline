@@ -1,0 +1,147 @@
+{
+  "pipeline_name": "VistaBalayan Tourism Data Analytics and Decision Support Pipeline",
+  "pipeline_run_id": "EXT_20261026_094742",
+  "run_started_at": "2026-10-26T09:47:42+00:00",
+  "raw_data_dir": "pipeline\\raw",
+  "sqlite_output": "pipeline\\processed\\vistabalayan_staging.sqlite",
+  "tables": {
+    "establishments": {
+      "status": "LOADED",
+      "source_file": "pipeline\\raw\\establishments.csv",
+      "columns": [
+        "id",
+        "name",
+        "type",
+        "address",
+        "contact_number",
+        "total_rooms",
+        "status",
+        "created_at",
+        "description",
+        "images",
+        "opening_hours",
+        "website_url",
+        "email",
+        "amenities",
+        "featured",
+        "updated_at",
+        "reporting_mode",
+        "ae_id",
+        "attraction_code",
+        "dot_classification",
+        "business_permit_number"
+      ],
+      "records_extracted": 38,
+      "validation_status": "PASS"
+    },
+    "visitor_reports": {
+      "status": "LOADED",
+      "source_file": "pipeline\\raw\\visitor_reports.csv",
+      "columns": [
+        "id",
+        "establishment_id",
+        "submitted_by",
+        "report_date",
+        "total_male",
+        "total_female",
+        "total_guests",
+        "residence_type",
+        "place_of_residence",
+        "municipality_province",
+        "status",
+        "reviewed_by",
+        "reviewed_at",
+        "notes",
+        "created_at",
+        "guest_name",
+        "guest_group_name",
+        "male_visitors",
+        "female_visitors",
+        "total_visitors",
+        "residence_category",
+        "municipality",
+        "province",
+        "country"
+      ],
+      "records_extracted": 2397,
+      "validation_status": "PASS"
+    },
+    "accommodation_reports": {
+      "status": "LOADED",
+      "source_file": "pipeline\\raw\\accommodation_reports.csv",
+      "columns": [
+        "id",
+        "establishment_id",
+        "submitted_by",
+        "report_date",
+        "total_rooms",
+        "total_occupied_rooms",
+        "total_check_ins",
+        "total_guest_nights",
+        "status",
+        "reviewed_by",
+        "reviewed_at",
+        "notes",
+        "created_at",
+        "guest_check_ins",
+        "guest_nights",
+        "rooms_occupied",
+        "foreign_guest_check_ins",
+        "foreign_guest_nights",
+        "submission_idempotency_key",
+        "short_stay_check_ins",
+        "room_usage_count"
+      ],
+      "records_extracted": 1857,
+      "validation_status": "PASS"
+    },
+    "room_occupancy_details": {
+      "status": "LOADED",
+      "source_file": "pipeline\\raw\\room_occupancy_details.csv",
+      "columns": [
+        "id",
+        "accommodation_report_id",
+        "room_type",
+        "room_code",
+        "number_of_rooms",
+        "occupied_rooms",
+        "check_ins",
+        "guest_nights",
+        "is_rent_mode",
+        "short_stay_check_ins",
+        "room_usage_count"
+      ],
+      "records_extracted": 5938,
+      "validation_status": "PASS"
+    }
+  },
+  "issues": [
+    {
+      "severity": "PASS",
+      "table": "visitor_reports",
+      "check": "foreign_key_relationship",
+      "column": "establishment_id",
+      "references": "establishments.id",
+      "missing_parent_count": 0
+    },
+    {
+      "severity": "PASS",
+      "table": "accommodation_reports",
+      "check": "foreign_key_relationship",
+      "column": "establishment_id",
+      "references": "establishments.id",
+      "missing_parent_count": 0
+    },
+    {
+      "severity": "PASS",
+      "table": "room_occupancy_details",
+      "check": "foreign_key_relationship",
+      "column": "accommodation_report_id",
+      "references": "accommodation_reports.id",
+      "missing_parent_count": 0
+    }
+  ],
+  "run_finished_at": "2026-10-26T09:47:42+00:00",
+  "overall_status": "PASS",
+  "handover_path": "C:\\Users\\banco\\VistaBalayan_Pipeline\\documentation\\transformation\\stage1-handover.md"
+}

@@ -18,6 +18,7 @@ from pipeline.database import DEFAULT_TABLES, create_client
 from pipeline.extract import export_all_tables
 from pipeline.staging import run as build_sqlite
 from pipeline.validate import validate_sqlite
+from pipeline.transform import run as transform_stage
 
 
 def command_test_connection(args: argparse.Namespace) -> dict:
@@ -43,6 +44,18 @@ def command_build_sqlite(args: argparse.Namespace) -> dict:
 
 def command_validate(args: argparse.Namespace) -> dict:
     return validate_sqlite(args.config, sqlite_path=args.sqlite_output, log_dir=args.log_dir)
+
+
+def command_transform(args: argparse.Namespace) -> dict:
+    return transform_stage(
+        sqlite_path=args.sqlite_output,
+        raw_dir=args.raw_dir,
+        output_dir=args.transform_output,
+        log_dir=args.log_dir,
+        run_id=args.run_id,
+        parent_run_id=args.parent_run_id,
+        stage1_results=args.stage1_results,
+    )
 
 
 def command_all(args: argparse.Namespace) -> dict:
@@ -100,6 +113,14 @@ def build_parser() -> argparse.ArgumentParser:
     validate_parser = subparsers.add_parser("validate", help="Validate SQLite metadata and relationships")
     add_common_paths(validate_parser)
     validate_parser.set_defaults(func=command_validate)
+
+    transform_parser = subparsers.add_parser("transform", help="Transform the local Stage 1 handover")
+    add_common_paths(transform_parser)
+    transform_parser.add_argument("--transform-output", default=Path("pipeline/transformed"), type=Path)
+    transform_parser.add_argument("--run-id")
+    transform_parser.add_argument("--parent-run-id", required=True, help="Actual Stage 1 extraction run ID")
+    transform_parser.add_argument("--stage1-results", default=Path("documentation/transformation/stage1-handover.md"), type=Path)
+    transform_parser.set_defaults(log_dir=Path("documentation/transformation/logs"), func=command_transform)
 
     all_parser = subparsers.add_parser("all", help="Run test/extract/build/validate pipeline")
     all_parser.add_argument("--env", default=Path(".env"), type=Path)
