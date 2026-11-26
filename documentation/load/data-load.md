@@ -489,3 +489,35 @@ The Data Load Stage follows these retention and access principles:
 6. Retention, archival, and deletion activities must be documented for accountability.
 
 These policies ensure that VistaBalayan load logs and rejected records remain available for operational monitoring, historical auditing, troubleshooting, and recovery.
+
+# 8. Load Acceptance, Rollback, and Completion Rules
+
+The Load Acceptance, Rollback, and Completion Stage defines the conditions for determining whether a batch has been successfully loaded into the VistaBalayan Reporting Database. It establishes the acceptance criteria, manual review requirements, failure handling procedures, and completion notifications to ensure that only validated data becomes available for reporting and analysis.
+
+## 8.1 Decision Rules
+
+The following rules determine the final status of each batch:
+
+| Overall Condition | Acceptance Decision | Pipeline Action | Decision Type |
+|---|---|---|---|
+| All target tables pass critical pre-load and post-load validation checks, and record reconciliation matches. | `APPROVED` | Commit the transaction, mark the batch as complete, and make the loaded data available for reporting. | Automatic |
+| All critical checks pass, but one or more non-critical warnings require confirmation. | `MANUAL_REVIEW` | Hold publication, record the warnings, and notify the responsible personnel for review. | Manual |
+| One or more critical validation checks fail before or after loading. | `REJECTED` | Roll back the entire batch transaction, record the failure details, and stop the loading process. | Automatic |
+| Database connection, storage, or temporary system availability issues prevent loading. | `FAILED` | Roll back the transaction, record the error, and perform the allowed retry procedure. | Automatic |
+
+## 8.2 Validation Summary and Final Decision
+
+The following example illustrates how the overall batch decision is determined based on the validation results of the four target tables.
+
+| Validation Summary | Result |
+|---|---|
+| `reporting.establishments` load | PASS |
+| `reporting.visitor_reports` load | PASS |
+| `reporting.accommodation_reports` load | PASS |
+| `reporting.room_occupancy_details` load | PASS |
+| Pre-load validation | PASS |
+| Post-load validation | PASS |
+| Record reconciliation | PASS |
+| Overall Load | APPROVED |
+
+The final batch status is determined by the combined validation results. A batch is approved only when all critical checks pass, record reconciliation matches, and the transaction is successfully committed. Batches requiring review or experiencing critical failures must follow the corresponding manual review or rejection procedures before their data can be made available for reporting.
