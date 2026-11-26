@@ -307,3 +307,39 @@ The loading process uses upsert operations with the original primary key (`id`) 
 - **Batch tracking:** The batch ID and transformation run ID are recorded in the audit metadata for traceability.
 
 The process does not use delete-by-batch-ID because the current transformed CSV datasets do not contain a `batch_id` column.
+
+
+# 4. Pre-Load Validation Checks
+
+The Pre-Load Validation Stage performs checks before writing approved transformed datasets into the VistaBalayan Reporting Database. These checks ensure that the target database is accessible, the target tables match the expected data structure, and the incoming datasets satisfy the requirements of the Transformation Stage handover. Loading proceeds only when all critical checks pass.
+
+## 4.1 Pre-Load Validation Checklist
+
+| Check Name | Target | Purpose | Validation Criteria | Severity |
+|---|---|---|---|---|
+| Target Connection | PostgreSQL reporting database | Ensure the target database is accessible before loading. | Database connection succeeds within the configured timeout. | Critical |
+| Write Permissions | Loading database account | Ensure the loading account can write to the target schema and tables. | Account has the required INSERT and UPDATE privileges on all four target tables. | Critical |
+| Target Table Existence | `reporting` schema | Ensure all required target tables are available. | `establishments`, `visitor_reports`, `accommodation_reports`, and `room_occupancy_details` exist. | Critical |
+| Schema Match | All target tables | Prevent column and data type mismatches during loading. | All required columns exist and their data types match the approved target data contract. | Critical |
+| Handover Completeness | Transformation handover metadata | Ensure all required input files and metadata are provided. | Four transformed CSV files, transformation run ID, extraction run ID, batch ID, batch window, record counts, and validation summary are available. | Critical |
+| Handover Status | Transformation handover metadata | Ensure only approved transformed datasets are loaded. | Handover status is `APPROVED`. | Critical |
+| Input Record Count | Four transformed CSV datasets | Confirm that incoming records match the approved transformation metadata. | Actual CSV record counts match the corresponding expected output record counts in the handover metadata. | Critical |
+| Primary Key Validation | All target tables | Prevent duplicate or missing record identifiers. | Primary key values are present and unique within each input dataset. | Critical |
+| Foreign Key Validation | Visitor, accommodation, and room occupancy tables | Ensure dependent records reference existing parent records. | Every `establishment_id` matches an establishment record, and every `accommodation_report_id` matches an accommodation report record. | Critical |
+| Required Field Validation | All target tables | Prevent records with missing required values. | All columns defined as NOT NULL contain valid values. | Critical |
+| Data Type Validation | All transformed CSV datasets | Prevent incompatible values from being written into target columns. | Incoming values can be converted to their corresponding target data types without errors. | Critical |
+| Storage Availability | PostgreSQL reporting database | Ensure sufficient storage is available for the incoming batch. | Available database storage meets the estimated storage requirement for the batch. | Critical |
+| Duplicate Batch Check | Proposed `pipeline_audit.load_log` | Prevent an already successful batch from being loaded again unintentionally. | The batch ID has no existing load record with `SUCCESS` status. | Critical |
+| Batch Metadata Consistency | Transformation handover metadata | Ensure batch identification and reporting period are consistent. | Transformation run ID, parent extraction run ID, batch ID, and batch window are present and consistent across the handover. | Critical |
+
+## 4.2 Validation Rules and Load Decision
+
+The load process follows these rules after performing the pre-load checks:
+
+- **Critical checks:** Any failed critical check stops the loading process. No records are written to the target tables.
+- **Non-critical checks:** Warnings are recorded in the pipeline audit metadata but do not stop loading when the required conditions are satisfied.
+- **Handover approval:** Only datasets with `APPROVED` status are accepted. Datasets marked `MANUAL_REVIEW`, `REJECTED`, or `FAILED` are not eligible for loading.
+- **Record count verification:** The actual number of records in each transformed CSV file must match the expected output count in the approved handover metadata.
+- **Duplicate batch prevention:** A batch previously recorded with `SUCCESS` status must not be loaded again as a new batch execution.
+- **Validation failure:** Failed checks must be recorded with the affected target, validation result, and error details for correction before retrying.
+
