@@ -410,3 +410,82 @@ The Data Load Stage maintains metadata and execution logs to monitor each batch 
 
 *Note: The example values are illustrative and do not represent confirmed production execution logs.*
 
+
+# 7. Log Retention, Rejected Data, and Access
+
+The Data Load Stage maintains loading logs, audit records, and rejected data to support monitoring, troubleshooting, auditing, and batch recovery. These records are stored separately from the main reporting tables to prevent operational logging information from affecting the reporting datasets.
+
+## 7.1 Log and Rejected Data Retention
+
+| Item | Storage Location | Retention Period | Purpose |
+|---|---|---|---|
+| Operational Load Logs | Proposed `pipeline_audit.load_log` table | 90 days | Supports monitoring, troubleshooting, and investigation of recent loading executions. |
+| Audit Records | Proposed `pipeline_audit` schema | 1 year | Maintains historical records of batch executions, validation results, and loading activities for auditing and traceability. |
+| Rejected Records | Proposed `pipeline_audit.rejected_records` table or restricted rejection files | 90 days | Preserves records that failed during loading for investigation and correction. |
+| Error Details | Proposed `pipeline_audit` schema | 90 days | Stores error codes, error messages, affected tables, and failure details for troubleshooting. |
+
+The retention periods are proposed operational policies and must be finalized before implementation. Logs and rejected records must not be deleted before their retention periods expire or while they are still needed for troubleshooting, auditing, or recovery.
+
+## 7.2 Access Permissions
+
+Access to load logs, audit records, and rejected data is controlled through database roles and permissions.
+
+| User or Role | Read | Write | Delete | Responsibility |
+|---|---|---|---|---|
+| Pipeline Operator | Yes | Yes | No | Monitors loading executions and reviews validation results and errors. |
+| Database Administrator | Yes | Yes | Yes, when authorized | Manages database storage, access permissions, backups, and approved retention operations. |
+| Municipal Tourism Officer | Authorized audit summaries only | No | No | Reviews relevant loading and data processing records for monitoring and administrative reference. |
+| Public Users | No | No | No | No access to pipeline logs, audit records, or rejected data. |
+
+
+
+## 7.3 Rejected Data Management
+
+
+The following rules apply:
+
+- Rejected records must not be inserted into the reporting tables.
+- Each rejected record must be associated with its batch ID, transformation run ID, target table, rejection reason, and rejection timestamp.
+- Rejected records must be stored in the proposed `pipeline_audit.rejected_records` table or a restricted rejection file location.
+- Rejected records must remain available for investigation and correction during the retention period.
+- Corrected records must undergo the Transformation Stage validation and receive an `APPROVED` handover status before being loaded again.
+- Rejected records must not be automatically deleted or silently discarded.
+
+Since the proposed loading strategy uses a single transaction for the entire batch, a critical loading failure causes the entire batch to roll back. Rejection details must therefore be captured separately so that the cause of failure can still be investigated after rollback.
+
+## 7.4 Archiving and Deletion Rules
+
+Operational logs, audit records, and rejected data follow defined retention and deletion procedures.
+
+- **Operational logs:** Retained for 90 days and archived when required for ongoing investigations.
+- **Audit records:** Retained for at least one year to support historical traceability and administrative review.
+- **Rejected data:** Retained for 90 days or longer when required for unresolved issues or recovery.
+- **Archiving:** Records needed beyond their operational retention period may be transferred to restricted archival storage.
+- **Deletion:** Expired records may be deleted only after confirming that they are no longer required for troubleshooting, auditing, or recovery.
+- **Responsibility:** Authorized database administrators perform approved archival and deletion operations.
+
+
+## 7.5 Backup and Recovery
+
+Before major loading operations or significant target database changes, a database backup or snapshot is recommended to support recovery in case of unexpected failures.
+
+The following backup rules apply:
+
+- The target PostgreSQL database should have a recent recoverable backup before major loading operations.
+- Backup copies must be stored separately from the active reporting database.
+- Backup access must be restricted to authorized database administrators.
+- Recovery procedures must be tested to ensure that backups can be restored when needed.
+- Failed batch transactions are rolled back before retrying, preventing partial records from remaining in the target tables.
+
+## 7.6 Retention and Access Policy
+
+The Data Load Stage follows these retention and access principles:
+
+1. Operational logs, audit records, and rejected data must be retained according to their defined retention periods.
+2. Records required for unresolved troubleshooting, auditing, or recovery must not be deleted even after the normal retention period has expired.
+3. Only authorized personnel may access or modify pipeline logs and rejected data.
+4. Deletion and archival operations must be performed by authorized database administrators.
+5. Backups must be maintained separately from the active reporting database.
+6. Retention, archival, and deletion activities must be documented for accountability.
+
+These policies ensure that VistaBalayan load logs and rejected records remain available for operational monitoring, historical auditing, troubleshooting, and recovery.
