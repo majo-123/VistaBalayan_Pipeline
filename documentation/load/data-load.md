@@ -343,3 +343,40 @@ The load process follows these rules after performing the pre-load checks:
 - **Duplicate batch prevention:** A batch previously recorded with `SUCCESS` status must not be loaded again as a new batch execution.
 - **Validation failure:** Failed checks must be recorded with the affected target, validation result, and error details for correction before retrying.
 
+
+# 5. Post-Load Validation and Reconciliation
+
+The Post-Load Validation Stage verifies whether the approved transformed datasets were successfully and accurately written into the VistaBalayan Reporting Database. It checks record counts, primary key uniqueness, referential integrity, required fields, and data consistency between the incoming batch and target tables.
+
+These checks are performed after loading without introducing additional data cleaning or business transformations. Any detected issues are documented and handled according to the error-handling procedures in Section 8.
+
+## 5.1 Post-Load Validation Checklist
+
+| Check Name | Target | Purpose | Validation Criteria | Severity |
+|---|---|---|---|---|
+| Record Reconciliation | All four target tables | Detect missing, rejected, or extra records during loading. | Records received = records loaded + records rejected. Records rejected during the Transformation Stage are excluded. | Critical |
+| Batch Row Count | All four target tables | Confirm that the expected records were loaded for the batch. | Number of records loaded for each table matches the approved transformation handover count, accounting for any load-level rejected records. | Critical |
+| Primary Key Uniqueness | `establishments.id`, `visitor_reports.id`, `accommodation_reports.id`, `room_occupancy_details.id` | Prevent duplicate records in the target tables. | Duplicate primary key count = 0. | Critical |
+| Referential Integrity | `visitor_reports.establishment_id` | Ensure visitor reports reference valid establishments. | All non-null foreign key values match `establishments.id`. | Critical |
+| Referential Integrity | `accommodation_reports.establishment_id` | Ensure accommodation reports reference valid establishments. | All non-null foreign key values match `establishments.id`. | Critical |
+| Referential Integrity | `room_occupancy_details.accommodation_report_id` | Ensure room occupancy details reference valid accommodation reports. | All non-null foreign key values match `accommodation_reports.id`. | Critical |
+| Required Field Validation | Required columns in all target tables | Ensure required data is not missing after loading. | Number of NULL values in NOT NULL columns = 0. | Critical |
+| Visitor Count Reconciliation | `visitor_reports` | Confirm visitor counts were not lost or changed during loading. | Sum of `total_visitors` in the approved input batch equals the sum of `total_visitors` loaded into the target for the same batch. | Critical |
+| Accommodation Count Reconciliation | `accommodation_reports` | Confirm accommodation statistics were loaded accurately. | Source batch totals for applicable numeric columns equal their corresponding target totals for the same batch. | Critical |
+| Room Occupancy Reconciliation | `room_occupancy_details` | Confirm room-level occupancy information was loaded accurately. | Source batch totals for applicable numeric columns equal their corresponding target totals for the same batch. | Critical |
+| Load Error Check | Load execution logs and audit metadata | Identify errors or interruptions during loading. | No unresolved SQL errors, constraint violations, or interrupted operations are recorded for a successful batch. | Critical |
+| Batch Status Verification | Proposed `pipeline_audit.load_log` | Confirm that the batch has completed successfully. | Batch status is recorded as `SUCCESS` only after all required post-load checks pass. | Critical |
+
+## 5.2 Reconciliation Rules
+
+The following rules are applied when verifying the loaded data:
+
+- **Record reconciliation:** The number of records received by the Data Load Stage must equal the number of records loaded plus records rejected during loading. Records already rejected during transformation are excluded.
+- **Row count verification:** The target record count must match the approved transformation output count, adjusted for any records rejected during loading.
+- **Key validation:** Each target table must contain unique primary key values.
+- **Referential integrity:** Every dependent record must reference an existing parent record through its foreign key.
+- **Required fields:** All columns defined as NOT NULL must contain values.
+- **Aggregate reconciliation:** Numeric totals in the approved transformed input must match the corresponding totals in the target database for the same batch.
+- **Load completion:** A batch is considered successful only when all critical validation checks pass and no unresolved loading errors remain.
+
+
