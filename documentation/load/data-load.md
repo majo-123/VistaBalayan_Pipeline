@@ -380,3 +380,33 @@ The following rules are applied when verifying the loaded data:
 - **Load completion:** A batch is considered successful only when all critical validation checks pass and no unresolved loading errors remain.
 
 
+# 6. Load Metadata and Log Specification
+
+The Data Load Stage maintains metadata and execution logs to monitor each batch loading operation and provide traceability between the Extraction, Transformation, and Data Load Stages. These records capture the batch information, target tables, loading results, validation outcomes, and errors encountered during execution.
+
+
+| Field | Purpose | Example Value or Format |
+|---|---|---|
+| `run_id` | Unique identifier for each Data Load execution. | `LOAD_20261020_0400` |
+| `transformation_run_id` | Identifies the Transformation Stage execution that produced the input datasets. | `TRF_20261019_2000` |
+| `extraction_run_id` | Links the load batch to its original Extraction Stage execution through the transformation metadata. | `EXT_20261019_1930` |
+| `batch_id` | Identifies the batch being loaded. | `BATCH_001` |
+| `batch_window` | Specifies the reporting date range covered by the batch. | `2026-10-01 to 2026-10-18` |
+| `table_name` | Identifies the target table receiving the records. | `reporting.visitor_reports` |
+| `load_type` | Specifies the loading strategy applied to the target table. | `INCREMENTAL` |
+| `load_start_ts` | Records the date and time when the loading operation starts. | `2026-10-20 04:00:02` |
+| `load_end_ts` | Records the date and time when the loading operation finishes. | `2026-10-20 04:03:41` |
+| `load_duration_sec` | Measures the total time required to complete the loading operation. | `219` |
+| `records_received` | Number of records received from the approved transformed dataset. | `2,400` |
+| `records_inserted` | Number of new records inserted into the target table. | `2,300` |
+| `records_updated` | Number of existing records updated through the upsert operation. | `100` |
+| `records_rejected` | Number of records that failed loading validation or database constraints. | `0` |
+| `status` | Indicates the final result of the loading operation. | `SUCCESS` |
+| `pre_load_result` | Records the outcome of the pre-load validation checks. | `PASS` |
+| `post_load_result` | Records the outcome of the post-load validation checks. | `PASS` |
+| `error_code` | Identifies the error encountered during loading, if applicable. | `NULL` |
+| `error_message` | Describes the loading error for troubleshooting, if applicable. | `NULL` |
+| `load_code_version` | Identifies the version of the Data Load implementation used. | `v1.0.0` |
+
+*Note: The example values are illustrative and do not represent confirmed production execution logs.*
+
