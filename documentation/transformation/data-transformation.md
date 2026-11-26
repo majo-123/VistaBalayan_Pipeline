@@ -138,3 +138,149 @@ Each batch must finish after the approved transformation output becomes availabl
 - Duplicate identifiers and incompatible data types must be rejected or flagged rather than silently inserted.
 - The loading process must retain batch information, record counts, execution status, validation results, and encountered errors for traceability.
 - The proposed target database, loading script, database role, and loading schedule must be verified and configured before implementation.
+
+
+# 2. Target Tables and Column Specification
+
+The Data Load Stage uses four target tables in the proposed VistaBalayan Reporting Database under the `reporting` schema. These tables receive the approved transformed CSV datasets from the Transformation Stage. The target structure preserves the original identifiers and foreign key relationships to maintain data traceability and consistency.
+
+The target tables are classified as staging tables because the pipeline retains the existing relational structure instead of creating separate dimension and fact tables.
+
+## 2.1 Target Table Summary
+
+| Table Name | Type | Primary Key | Foreign Keys | Key Constraints | Purpose |
+|---|---|---|---|---|---|
+| `reporting.establishments` | Staging | `id` | None | `id` PRIMARY KEY; `name` NOT NULL; `type` NOT NULL; `total_rooms` DEFAULT 0 | Stores tourism establishment information for classification, identification, and reporting. |
+| `reporting.visitor_reports` | Staging | `id` | `establishment_id` → `reporting.establishments(id)` | `id` PRIMARY KEY; `report_date` NOT NULL; `total_visitors` NOT NULL; visitor counts DEFAULT 0 | Stores visitor counts and visitor-origin information for tourism monitoring and analysis. |
+| `reporting.accommodation_reports` | Staging | `id` | `establishment_id` → `reporting.establishments(id)` | `id` PRIMARY KEY; `report_date` NOT NULL; `total_rooms` NOT NULL; count columns DEFAULT 0 | Stores accommodation reports and guest statistics for occupancy and accommodation analysis. |
+| `reporting.room_occupancy_details` | Staging | `id` | `accommodation_report_id` → `reporting.accommodation_reports(id)` | `id` PRIMARY KEY; `room_type` NOT NULL; count columns DEFAULT 0 | Stores room-level occupancy information for detailed accommodation monitoring. |
+
+## 2.2 `reporting.establishments`
+
+**Table Type:** Staging
+
+**Purpose:** Stores information identifying and classifying tourism establishments. It serves as the parent table for visitor and accommodation reports.
+
+| Column | Data Type | Key / Constraint | Description |
+|---|---|---|---|
+| `id` | UUID | PRIMARY KEY | Unique identifier for each establishment. |
+| `name` | VARCHAR(150) | NOT NULL | Name of the tourism establishment. |
+| `type` | VARCHAR(50) | NOT NULL | Establishment classification, such as hotel, resort, or other tourism service. |
+| `address` | TEXT | — | Location or address of the establishment. |
+| `status` | TEXT | — | Identifies the establishment's current status. |
+| `reporting_mode` | TEXT | — | Identifies the reporting type handled by the establishment. |
+| `total_rooms` | INTEGER | DEFAULT 0 | Total number of rooms for accommodation establishments. |
+
+**Load Dependencies:**
+
+- Match Key: `id`
+- Batch ID Column: `batch_id` (proposed load-control column; not included in the current transformed CSV contract).
+- History Columns: Not applicable. SCD Type 2 is not used because the pipeline preserves establishment records without implementing historical dimension tracking.
+- Foreign Key Dependencies: None.
+- Indexes: Primary key index on `id`; an index on `type` may be added to support establishment classification queries.
+
+**Reason for Inclusion:** Establishment information is required to identify tourism establishments and connect visitor and accommodation reports to their corresponding establishments.
+
+## 2.3 `reporting.visitor_reports`
+
+**Table Type:** Staging
+
+**Purpose:** Stores visitor arrival reports submitted by tourist establishments. The records support visitor monitoring, visitor-origin analysis, and tourism reporting.
+
+| Column | Data Type | Key / Constraint | Description |
+|---|---|---|---|
+| `id` | UUID | PRIMARY KEY | Unique identifier for each visitor report. |
+| `establishment_id` | UUID | FOREIGN KEY → `establishments.id` | Identifies the establishment that submitted the report. |
+| `report_date` | DATE | NOT NULL | Date covered by the visitor report. |
+| `male_visitors` | INTEGER | DEFAULT 0 | Number of male visitors. |
+| `female_visitors` | INTEGER | DEFAULT 0 | Number of female visitors. |
+| `total_visitors` | INTEGER | NOT NULL | Total number of visitors. |
+| `residence_category` | VARCHAR(50) | — | Visitor origin category, such as local, domestic, or foreign. |
+| `municipality` | VARCHAR(100) | — | Municipality of visitor origin, if available. |
+| `province` | VARCHAR(100) | — | Province of visitor origin, if available. |
+| `country` | VARCHAR(100) | — | Country of visitor origin, if available. |
+
+**Load Dependencies:**
+
+- Match Key: `id`
+- Batch ID Column: `batch_id` (proposed load-control column; not included in the current transformed CSV contract).
+- History Columns: Not applicable. SCD Type 2 is not implemented.
+- Foreign Key: `establishment_id` references `reporting.establishments(id)`.
+- Indexes: Primary key index on `id`; indexes on `establishment_id` and `report_date` may be added for report retrieval and date-based analysis.
+
+**Reason for Inclusion:** Visitor reports provide the primary data needed to monitor visitor volume, compare reporting periods, and analyze visitor origins.
+
+## 2.4 `reporting.accommodation_reports`
+
+**Table Type:** Staging
+
+**Purpose:** Stores accommodation-related tourism reports submitted by establishments. These records support accommodation monitoring, guest statistics, and occupancy analysis.
+
+| Column | Data Type | Key / Constraint | Description |
+|---|---|---|---|
+| `id` | UUID | PRIMARY KEY | Unique identifier for each accommodation report. |
+| `establishment_id` | UUID | FOREIGN KEY → `establishments.id` | Identifies the accommodation establishment that submitted the report. |
+| `report_date` | DATE | NOT NULL | Date covered by the accommodation report. |
+| `total_rooms` | INTEGER | NOT NULL | Total available rooms reported for the period. |
+| `occupied_rooms` | INTEGER | DEFAULT 0 | Number of occupied rooms. |
+| `guest_check_ins` | INTEGER | DEFAULT 0 | Number of guest check-ins during the report period. |
+| `guest_nights` | INTEGER | DEFAULT 0 | Total guest nights during the report period. |
+| `foreign_guest_check_ins` | INTEGER | DEFAULT 0 | Number of foreign guest check-ins. |
+| `foreign_guest_nights` | INTEGER | DEFAULT 0 | Number of foreign guest nights. |
+
+**Load Dependencies:**
+
+- Match Key: `id`
+- Batch ID Column: `batch_id` (proposed load-control column; not included in the current transformed CSV contract).
+- History Columns: Not applicable. SCD Type 2 is not implemented.
+- Foreign Key: `establishment_id` references `reporting.establishments(id)`.
+- Indexes: Primary key index on `id`; indexes on `establishment_id` and `report_date` may be added for accommodation reporting and historical retrieval.
+
+**Reason for Inclusion:** Accommodation reports provide the room capacity, occupancy, and guest statistics required for accommodation performance monitoring and tourism analysis.
+
+## 2.5 `reporting.room_occupancy_details`
+
+**Table Type:** Staging
+
+**Purpose:** Stores detailed room occupancy information associated with accommodation reports. It provides room-level data for analyzing room availability, occupancy, check-ins, and guest nights.
+
+| Column | Data Type | Key / Constraint | Description |
+|---|---|---|---|
+| `id` | UUID | PRIMARY KEY | Unique identifier for each room occupancy detail record. |
+| `accommodation_report_id` | UUID | FOREIGN KEY → `accommodation_reports.id` | Identifies the related accommodation report. |
+| `room_type` | VARCHAR(100) | NOT NULL | Type or category of room. |
+| `number_of_rooms` | INTEGER | DEFAULT 0 | Number of rooms under the room type. |
+| `occupied_rooms` | INTEGER | DEFAULT 0 | Number of occupied rooms under the room type. |
+| `check_ins` | INTEGER | DEFAULT 0 | Number of check-ins for the room type. |
+| `guest_nights` | INTEGER | DEFAULT 0 | Number of guest nights for the room type. |
+
+**Load Dependencies:**
+
+- Match Key: `id`
+- Batch ID Column: `batch_id` (proposed load-control column; not included in the current transformed CSV contract).
+- History Columns: Not applicable. SCD Type 2 is not implemented.
+- Foreign Key: `accommodation_report_id` references `reporting.accommodation_reports(id)`.
+- Indexes: Primary key index on `id`; an index on `accommodation_report_id` may be added to support report-level occupancy retrieval.
+
+**Reason for Inclusion:** Room occupancy details provide more specific accommodation information and support room-type occupancy analysis.
+
+## 2.6 Keys, Relationships, and Load Considerations
+
+The target tables preserve the primary and foreign key relationships established in the source and transformation stages.
+
+| Relationship | Key Relationship | Purpose |
+|---|---|---|
+| Establishments → Visitor Reports | `visitor_reports.establishment_id` → `establishments.id` | Connects visitor reports to their reporting establishments. |
+| Establishments → Accommodation Reports | `accommodation_reports.establishment_id` → `establishments.id` | Connects accommodation reports to their establishments. |
+| Accommodation Reports → Room Occupancy Details | `room_occupancy_details.accommodation_report_id` → `accommodation_reports.id` | Connects room occupancy records to their parent accommodation reports. |
+
+The loading order follows the parent-to-child relationships:
+
+1. `reporting.establishments`
+2. `reporting.visitor_reports`
+3. `reporting.accommodation_reports`
+4. `reporting.room_occupancy_details`
+
+The original UUID identifiers are retained as primary keys. No additional surrogate keys or SCD Type 2 history columns are defined because the current pipeline does not implement a dimensional model or historical dimension tracking.
+
+
