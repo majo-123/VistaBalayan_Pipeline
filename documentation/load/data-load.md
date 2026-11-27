@@ -566,3 +566,16 @@ To maintain data integrity and ensure that loading problems are handled consiste
 7. **Final Validation:** After a successful loading attempt, the system must repeat the required post-load validation and reconciliation checks to verify that the target records match the approved transformed input.
 
 8. **Completion Logging:** The final batch status must be recorded in the pipeline audit metadata. Only batches that pass all critical validation checks and are successfully committed may receive a `SUCCESS` loading status and an `APPROVED` final acceptance decision.
+
+## 9.3 Monitoring and Maintenance Recommendations
+
+The following monitoring activities are recommended to maintain the reliability and performance of the VistaBalayan Data Load Stage:
+
+- **Database Availability:** Regularly monitor the PostgreSQL reporting database to ensure that it is accessible during the scheduled loading period.
+- **Batch Execution Time:** Monitor the duration of each loading operation and investigate executions that exceed the expected 30-minute completion time.
+- **Record Count Monitoring:** Compare the number of received, inserted, updated, and rejected records against the approved transformation metadata.
+- **Data Integrity Monitoring:** Regularly verify primary key uniqueness, foreign key relationships, required fields, and numeric aggregate reconciliation.
+- **Audit Log Monitoring:** Review pipeline audit records to identify failed batches, repeated execution attempts, validation failures, and unresolved loading errors.
+- **Storage Monitoring:** Monitor database storage capacity to prevent insufficient storage from interrupting future loading operations.
+- **Backup and Recovery:** Maintain recoverable database backups and periodically verify that the restoration procedures work as expected.
+- **Access Control Monitoring:** Review the permissions of the `vistabalayan_loader` database role to ensure that it has only the necessary privileges for loading and audit operations.
