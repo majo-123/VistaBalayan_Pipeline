@@ -546,3 +546,23 @@ The following problems and mitigation procedures are considered in the design of
 | **Slow Batch Loading Performance** | Large transformed datasets, inefficient SQL operations, row-by-row insertion, or excessive database resource usage increase loading time. | The batch may exceed its expected completion time of 30 minutes, delay reporting availability, and interfere with other database operations. | Use PostgreSQL COPY for bulk loading into temporary staging tables and SQL INSERT with UPSERT logic for transferring validated records into target tables. Monitor execution duration and optimize database queries and indexes when necessary. |
 | **Audit Log or Metadata Recording Failure** | The pipeline audit schema is unavailable, the loading account lacks write permissions, or an error occurs while recording batch execution details. | Batch execution results may not be properly recorded, making it difficult to trace loading activities, identify failures, and verify whether a batch was successfully completed. | Verify audit schema availability and write permissions before loading. Record the run ID, transformation run ID, batch ID, record counts, execution timestamps, and validation results. Do not mark a batch as successful without the required audit information. |
 | **Incorrect or Incomplete Batch Handover** | The Transformation Stage provides missing datasets, incomplete metadata, an unapproved handover status, or inconsistent batch identifiers. | The loading process may use incomplete or unverified input, resulting in inaccurate records or loss of traceability between pipeline stages. | Require all four transformed datasets and complete handover metadata before loading. Verify the transformation run ID, extraction run ID, batch ID, batch window, record counts, validation results, and APPROVED handover status. Stop loading when required information is missing or inconsistent. |
+
+## 9.2 Load Problem Handling and Recovery Procedures
+
+To maintain data integrity and ensure that loading problems are handled consistently, the following procedures must be followed:
+
+1. **Problem Detection:** The loading script must identify errors through pre-load validation, database operations, and post-load verification.
+
+2. **Error Recording:** Each encountered problem must be documented with its corresponding batch ID, transformation run ID, affected target table, error code, error message, and execution timestamp.
+
+3. **Batch Interruption:** Critical errors must stop the loading process. The entire database transaction must be rolled back to prevent partially loaded records from remaining in the target tables.
+
+4. **Rejected Data Management:** Rejected records and relevant error details must be retained in the proposed `pipeline_audit.rejected_records` table or restricted rejection files for investigation and correction.
+
+5. **Issue Resolution:** Database connectivity, storage, schema, data type, and referential integrity problems must be resolved before another loading attempt is performed.
+
+6. **Batch Retry:** Failed batches may be processed again after the underlying issue has been corrected. The loader must use the original primary keys and batch tracking information to prevent unintended duplicate records.
+
+7. **Final Validation:** After a successful loading attempt, the system must repeat the required post-load validation and reconciliation checks to verify that the target records match the approved transformed input.
+
+8. **Completion Logging:** The final batch status must be recorded in the pipeline audit metadata. Only batches that pass all critical validation checks and are successfully committed may receive a `SUCCESS` loading status and an `APPROVED` final acceptance decision.
